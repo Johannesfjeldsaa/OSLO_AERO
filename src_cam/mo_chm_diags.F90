@@ -105,6 +105,9 @@ contains
     integer :: bulkaero_species(20)
     logical :: history_dust
     ! OSLO_AERO begin
+    logical :: history_aerosol_base
+    logical :: history_aerosol_decomposed
+    logical :: history_aerosol_gasphase
     integer :: cloudTracerIndex_direct
     character(len=20) :: cloudTracerName
     ! OSLO_AERO end
@@ -117,6 +120,14 @@ contains
                        history_cesm_forcing_out = history_cesm_forcing, &
                        history_scwaccm_forcing_out = history_scwaccm_forcing, &
                        history_dust_out = history_dust )
+    ! OSLO_AERO begin
+    call phys_getopts( &
+      history_aerosol_base_out = history_aerosol_base, &
+      history_aerosol_decomposed_out = history_aerosol_decomposed, &
+      history_aerosol_gasphase_out = history_aerosol_gasphase &
+      )
+    ! OSLO_AERO end
+
 
     id_bry     = get_spc_ndx( 'BRY' )
     id_cly     = get_spc_ndx( 'CLY' )
@@ -356,9 +367,11 @@ contains
          flag_xyfill=.True. )
 !
     do m = 1,gas_pcnst
-
+       
+       ! get the species name 
        spc_name = trim(solsym(m))
-
+       
+       ! ant then get the index of the constituent, is -1 if spc_name is not recongniced
        call cnst_get_ind(spc_name, n, abort=.false. )
        if ( n > 0 ) then
           attr = cnst_longname(n)
@@ -463,57 +476,94 @@ contains
           if (m==id_cfc12 ) call add_default( spc_name, 1, ' ')
        endif
 
-       ! OSLO_AERO begin
-       call add_default( spc_name, 1, ' ' )
+      ! OSLO_AERO begin
+      ! Add the 3D consentrations 
+      if ( n > 0 ) then 
+         ! if history_aerosol_decomposed we add the aerosol species
+         if ( (any( aer_species == m ) .or. isAerosol(n)) .and. history_aerosol_decomposed ) then
+            call add_default( spc_name, 1, ' ' )
+         ! if it is not an aerosol species it is a gas species and we then require the history_aerosol_gasphase flagg
+         else 
+            if ( history_aerosol_gasphase ) then 
+               call add_default( spc_name, 1, ' ' )
+            endif
+         endif
+      endif 
 
-       !output 3d-field of aersol tracer in cloud water
-       if(n > 0) then
-          cloudTracerIndex_direct = getCloudTracerIndexDirect(n)
-          if(cloudTracerIndex_direct > 0)then
-             cloudTracerName(1:len(CloudTracerName))=" "
-             cloudTracerName = getCloudTracerName(n)
-             call addfld( trim(cloudTracerName), (/'lev'/), 'A','kg/kg', &
-                  trim(cloudTracerName)//' in cloud water')
-             call add_default( trim(cloudTracerName), 1, ' ' )
+      if(n > 0) then
+         ! Add cloud tracers to default output
+         cloudTracerIndex_direct = getCloudTracerIndexDirect(n)
+         if ( cloudTracerIndex_direct > 0 ) then
+            ! first the 3d fields, 
+            cloudTracerName(1:len(CloudTracerName))=" "
+            cloudTracerName = getCloudTracerName(n)
+            call addfld( trim(cloudTracerName), (/'lev'/), 'A','kg/kg', &
+               trim(cloudTracerName)//' in cloud water')
+            if ( history_aerosol_decomposed ) then
+               call add_default( trim(cloudTracerName), 1, ' ' )
+            endif
 
-             !Add column burden of cloud tracers
-             call addfld('cb_'//trim(cloudTracerName),horiz_only, 'A', 'kg/m2', &
-                  'cb_'//trim(cloudTracerName)//' column in cloud water')
-             call add_default('cb_'//trim(cloudTracerName),1,' ')
-          endif
-          !..and column burden in clean air
-          call addfld('cb_'//trim(spc_name),horiz_only, 'A', 'kg/m2', &
-               'cb_'//trim(spc_name)//' in column')
-          call add_default('cb_'//trim(spc_name),1,' ' )
+            ! and then then add column burden of cloud tracers
+            call addfld('cb_'//trim(cloudTracerName),horiz_only, 'A', 'kg/m2', &
+               'cb_'//trim(cloudTracerName)//' column in cloud water')
+            if ( history_aerosol_decomposed ) then 
+               call add_default('cb_'//trim(cloudTracerName),1,' ')
+            endif
+         endif
+          
+         ! ... Then add the column burden in clean air 
+         call addfld('cb_'//trim(spc_name),horiz_only, 'A', 'kg/m2', &
+            'cb_'//trim(spc_name)//' in column')
 
-          if (history_aerosol)then
-             if (cloudTracerIndex_direct > 0)then
-                !Output budget-terms for cloud borne aerosols
-                call add_default (trim(cloudTracerName)//'GVF', 1, ' ')
-                call add_default (trim(cloudTracerName)//'SFWET', 1, ' ')
-                call add_default (trim(cloudTracerName)//'TBF', 1, ' ')
-                call add_default (trim(cloudTracerName)//'DDF', 1, ' ')
-                call add_default (trim(cloudTracerName)//'SFSBS', 1, ' ')
-                call add_default (trim(cloudTracerName)//'SFSIC', 1, ' ')
-                call add_default (trim(cloudTracerName)//'SFSBC', 1, ' ')
-                call add_default (trim(cloudTracerName)//'SFSIS', 1, ' ')
-             endif
-          endif
-       end if
-       ! OSLO_AERO end
+         ! if the species is an aerosol we require history_aerosol_decomposed flagg
+         if ( any( aer_species == m ) .or. isAerosol(n) ) then
+            if ( history_aerosol_decomposed ) then
+               call add_default('cb_'//trim(spc_name),1,' ' )
+            endif
+         ! else, if it is a gasphase the cb is included in the base so we require history_aerosol_base flagg
+         else 
+            if ( history_aerosol_base ) then 
+               call add_default('cb_'//trim(spc_name), 1, ' ')
+            endif
+         endif 
+
+         if (history_aerosol) then
+            if (cloudTracerIndex_direct > 0) then
+               !Output budget-terms for cloud borne aerosols
+               call add_default (trim(cloudTracerName)//'GVF', 1, ' ')
+               call add_default (trim(cloudTracerName)//'SFWET', 1, ' ')
+               call add_default (trim(cloudTracerName)//'TBF', 1, ' ')
+               call add_default (trim(cloudTracerName)//'DDF', 1, ' ')
+               call add_default (trim(cloudTracerName)//'SFSBS', 1, ' ')
+               call add_default (trim(cloudTracerName)//'SFSIC', 1, ' ')
+               call add_default (trim(cloudTracerName)//'SFSBC', 1, ' ')
+               call add_default (trim(cloudTracerName)//'SFSIS', 1, ' ')
+            endif
+         endif
+      end if
+      ! OSLO_AERO end
 
     enddo
 
     call addfld( 'MASS', (/ 'lev' /), 'A', 'kg', 'mass of grid box' )
     call addfld( 'AREA', horiz_only,  'A', 'm2', 'area of grid box' )
-    ! OSLO_AERO begin
+   ! OSLO_AERO begin
+   ! iterate over the compounded aerosol types
    do n=1,N_AEROSOL_TYPES
+      ! add the column burden of the compound aerosols to output
       call addfld('cb_'//trim(aerosol_type_name(n)),horiz_only, 'A', 'kg/m2',&
          'cb_'//trim(aerosol_type_name(n))//' column of aerosol type')
-      call add_default('cb_'//trim(aerosol_type_name(n)), 1, ' ')
+      ! we require history_aerosol_base flagg
+      if ( history_aerosol_base ) then 
+         call add_default('cb_'//trim(aerosol_type_name(n)), 1, ' ')
+      endif
+      ! add the mass mixing ratio of the compound aerosols to output
       call addfld('mmr_'//trim(aerosol_type_name(n)),(/'lev'/),'A','kg/kg' ,&
          'mmr_'//trim(aerosol_type_name(n))//' mmr of aerosol type')
-      call add_default('mmr_'//trim(aerosol_type_name(n)), 1, ' ')
+      ! we require history_aerosol_base flagg
+      if ( history_aerosol_base ) then
+         call add_default('mmr_'//trim(aerosol_type_name(n)), 1, ' ')
+      endif
    end do
    ! OSLO_AERO end
 
@@ -741,6 +791,7 @@ contains
        spc_name = trim(solsym(m))
        call cnst_get_ind(spc_name, n, abort=.false.)
 
+       ! output surface mmr and vmr
        if (n.gt.0) then
           if ( any( aer_species == m ) .or. isAerosol(n) ) then
              call outfld( solsym(m), mmr(:ncol,:,m), ncol ,lchnk )
