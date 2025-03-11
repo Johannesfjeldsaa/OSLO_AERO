@@ -480,8 +480,10 @@ contains
       ! Add the 3D consentrations 
       if ( n > 0 ) then 
          ! if history_aerosol_decomposed we add the aerosol species
-         if ( (any( aer_species == m ) .or. isAerosol(n)) .and. history_aerosol_decomposed ) then
-            call add_default( spc_name, 1, ' ' )
+         if ( (any( aer_species == m ) .or. isAerosol(n)) ) then
+            if ( history_aerosol_decomposed ) then
+               call add_default( spc_name, 1, ' ' )
+            endif
          ! if it is not an aerosol species it is a gas species and we then require the history_aerosol_gasphase flagg
          else 
             if ( history_aerosol_gasphase ) then 
