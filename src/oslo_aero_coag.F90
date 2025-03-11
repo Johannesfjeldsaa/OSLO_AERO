@@ -11,7 +11,7 @@ module oslo_aero_coag
   use chem_mods,      only: gas_pcnst
   use mo_tracname,    only: solsym
   use mo_constants,   only: pi
-  use physconst,      only: rair, gravit
+  use physconst,      only: rair, gravit, rhoh2o
   use cam_history,    only: addfld, add_default, fieldname_len, horiz_only, outfld
   use cam_logfile,    only: iulog
   !
@@ -99,7 +99,6 @@ module oslo_aero_coag
   real(r8), parameter :: temperatureLookupTables = 293.15_r8 !Temperature used in look up tables
   real(r8), parameter :: mfpAir = 63.3e-9_r8                 ![m] mean free path air
   real(r8), parameter :: viscosityAir = 1.983e-5_r8          ![Pa s] viscosity of air
-  real(r8), parameter :: rhoh2o = 1000._r8                   !Density of water
 
 !================================================================
 contains
