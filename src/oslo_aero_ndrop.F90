@@ -108,7 +108,6 @@ contains
     character(len=32)  :: tmpname_cw
     character(len=128) :: long_name
     character(len=8)   :: unit
-    logical            :: history_amwg ! output the variables used by the AMWG diag package
     character(len=10)  :: modeString
     character(len=20)  :: varname
     !-------------------------------------------------------------------------------
@@ -176,8 +175,7 @@ contains
 
     ! Add dropmixnuc tendencies for all modal aerosol species
 
-    call phys_getopts(history_amwg_out = history_amwg, &
-         history_aerosol_out = history_aerosol, prog_modal_aero_out=prog_modal_aero)
+    call phys_getopts(history_aerosol_out = history_aerosol, prog_modal_aero_out=prog_modal_aero)
 
     prog_modal_aero = .TRUE.
     n_aerosol_tracers = getNumberOfAerosolTracers()
