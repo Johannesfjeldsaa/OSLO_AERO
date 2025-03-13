@@ -486,6 +486,10 @@ contains
                call add_default( spc_name, 1, ' ' )
             endif
          endif
+      elseif ( trim(spc_name) == 'H2O' ) then
+         if ( history_aerosol_gasphase ) then 
+            call add_default( spc_name, 1, ' ' )
+         endif
       endif 
 
       if(n > 0) then
