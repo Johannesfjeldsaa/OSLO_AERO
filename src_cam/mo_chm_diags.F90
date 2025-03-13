@@ -119,14 +119,10 @@ contains
                        history_chemspecies_srf_out = history_chemspecies_srf, &
                        history_cesm_forcing_out = history_cesm_forcing, &
                        history_scwaccm_forcing_out = history_scwaccm_forcing, &
-                       history_dust_out = history_dust )
-    ! OSLO_AERO begin
-    call phys_getopts( &
-      history_aerosol_base_out = history_aerosol_base, &
-      history_aerosol_decomposed_out = history_aerosol_decomposed, &
-      history_aerosol_gasphase_out = history_aerosol_gasphase &
-      )
-    ! OSLO_AERO end
+                       history_dust_out = history_dust, &
+                       history_aerosol_base_out = history_aerosol_base, &              ! OSLO_AERO begin
+                       history_aerosol_decomposed_out = history_aerosol_decomposed, &
+                       history_aerosol_gasphase_out = history_aerosol_gasphase )       ! OSLO_AERO end
 
 
     id_bry     = get_spc_ndx( 'BRY' )
