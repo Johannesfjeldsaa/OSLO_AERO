@@ -20,6 +20,7 @@ module oslo_aero_ocean
   use cam_abortutils, only : endrun
   use cam_logfile,    only : iulog
   use cam_history,    only : addfld, add_default, horiz_only, outfld
+  use phys_control,   only : phys_getopts
   use physics_types,  only : physics_state
   use physics_buffer, only : physics_buffer_desc
   use tracer_data,    only : trfld, trfile, trcdata_init, advance_trcdata
@@ -183,6 +184,9 @@ contains
             oceanspcs(m)%fields, oceanspcs(m)%file, rmv_file, &
             cycle_yr(m), fixed_ymd, fixed_tod, data_type(m) )
     enddo
+
+    call phys_getopts( history_aerosol_oxidant_out = history_aerosol_oxidant )
+    
     call addfld( 'odms', horiz_only,  'A',  'nmol/L', 'DMS upper ocean concentration' )
     if ( history_aerosol_oxidant ) then
       call add_default('odms', 1, ' ')
