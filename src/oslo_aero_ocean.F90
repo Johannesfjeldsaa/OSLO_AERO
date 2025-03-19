@@ -132,7 +132,7 @@ contains
     integer            :: cycle_yr(2)
     character(len=32)  :: data_type(2)
     character(len=16)  :: emis_species(2)
-    logical            :: history_aerosol_oxidant
+    logical            :: history_aerosol_forcing
 
     ! Collect and save namelist information in module
     call oslo_aero_ocean_getnl()
@@ -185,10 +185,10 @@ contains
             cycle_yr(m), fixed_ymd, fixed_tod, data_type(m) )
     enddo
 
-    call phys_getopts( history_aerosol_oxidant_out = history_aerosol_oxidant )
+    call phys_getopts( history_aerosol_forcing_out = history_aerosol_forcing )
     
     call addfld( 'odms', horiz_only,  'A',  'nmol/L', 'DMS upper ocean concentration' )
-    if ( history_aerosol_oxidant ) then
+    if ( history_aerosol_forcing ) then
       call add_default('odms', 1, ' ')
     endif
 

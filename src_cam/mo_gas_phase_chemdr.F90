@@ -29,7 +29,7 @@ module mo_gas_phase_chemdr
   integer :: ndx_cldfr, ndx_cmfdqr, ndx_nevapr, ndx_cldtop, ndx_prain
   integer :: ndx_h2so4
   ! OSLO_AERO begin
-  logical :: history_aerosol_oxidant            ! history flagg for oxidant diagnostic output
+  logical :: history_aerosol_forcing            ! history flagg for forcing diagnostic output
   logical :: inv_o3, inv_oh, inv_no3, inv_ho2
   integer :: id_o3, id_oh, id_no3, id_ho2
   ! OSLO_AERO end
@@ -81,7 +81,7 @@ contains
     logical :: history_scwaccm_forcing
     
     ! OSLO_AERO begin
-    call phys_getopts( history_aerosol_oxidant_out = history_aerosol_oxidant )
+    call phys_getopts( history_aerosol_forcing_out = history_aerosol_forcing )
     ! OSLO_AERO end
     call phys_getopts( history_scwaccm_forcing_out = history_scwaccm_forcing )
 
@@ -242,7 +242,7 @@ contains
        call addfld ('HO2_aft   ',  (/ 'lev' /), 'A','molecules cm-3', 'HO2 invariants after adding diurnal variations'           )
        call addfld ('NO3_aft   ',  (/ 'lev' /), 'A','molecules cm-3', 'NO3 invariants after adding diurnal variations'           )
        
-       if ( history_aerosol_oxidant ) then 
+       if ( history_aerosol_forcing ) then 
          call add_default ('OH_bef       ', 1, ' ')
          call add_default ('HO2_bef      ', 1, ' ')
          call add_default ('NO3_bef      ', 1, ' ')

@@ -107,7 +107,7 @@ contains
     ! OSLO_AERO begin
     logical :: history_aerosol_base
     logical :: history_aerosol_decomposed
-    logical :: history_aerosol_gasphase
+    logical :: history_gas
     integer :: cloudTracerIndex_direct
     character(len=20) :: cloudTracerName
     ! OSLO_AERO end
@@ -122,7 +122,7 @@ contains
                        history_dust_out = history_dust, &
                        history_aerosol_base_out = history_aerosol_base, &              ! OSLO_AERO begin
                        history_aerosol_decomposed_out = history_aerosol_decomposed, &
-                       history_aerosol_gasphase_out = history_aerosol_gasphase )       ! OSLO_AERO end
+                       history_gas_out = history_gas )       ! OSLO_AERO end
 
 
     id_bry     = get_spc_ndx( 'BRY' )
@@ -480,14 +480,14 @@ contains
             if ( history_aerosol_decomposed ) then
                call add_default( spc_name, 1, ' ' )
             endif
-         ! if it is not an aerosol species it is a gas species and we then require the history_aerosol_gasphase flagg
+         ! if it is not an aerosol species it is a gas species and we then require the history_gas flagg
          else 
-            if ( history_aerosol_gasphase ) then 
+            if ( history_gas ) then 
                call add_default( spc_name, 1, ' ' )
             endif
          endif
       elseif ( trim(spc_name) == 'H2O' ) then
-         if ( history_aerosol_gasphase ) then 
+         if ( history_gas ) then 
             call add_default( spc_name, 1, ' ' )
          endif
       endif 
