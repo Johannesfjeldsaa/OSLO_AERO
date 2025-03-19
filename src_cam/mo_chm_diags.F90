@@ -709,105 +709,105 @@ contains
    cb_aerosol_type(:,:) = 0.0_r8
    mmr_aerosol_type(:,:,:) = 0.0_r8
    ! OSLO_AERO end
-    do m = 1,gas_pcnst
+   do m = 1,gas_pcnst
 
- !...FOY (counting Fluorines, not chlorines or bromines)
-       if ( m == id_cfc12 .or. m == id_hcfc22 .or. m == id_cf2clbr .or. m == id_h1202 .or. m == id_hcfc142b &
-            .or. m == id_cof2 ) then
-          wgt = 2._r8
-       elseif ( m == id_cfc113 .or. m == id_cf3br ) then
-          wgt = 3._r8
-       elseif ( m == id_cfc114 .or. m == id_h2402 ) then
-          wgt = 4._r8
-       elseif ( m == id_cfc115 ) then
-          wgt = 5._r8
-       else
-          wgt = 1._r8
-       endif
-       if ( any( foy_species == m ) ) then
-          vmr_foy(:ncol,:) = vmr_foy(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
-       if ( any( tfy_species == m ) ) then
-          vmr_tfy(:ncol,:) = vmr_tfy(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
+   !...FOY (counting Fluorines, not chlorines or bromines)
+      if ( m == id_cfc12 .or. m == id_hcfc22 .or. m == id_cf2clbr .or. m == id_h1202 .or. m == id_hcfc142b &
+         .or. m == id_cof2 ) then
+         wgt = 2._r8
+      elseif ( m == id_cfc113 .or. m == id_cf3br ) then
+         wgt = 3._r8
+      elseif ( m == id_cfc114 .or. m == id_h2402 ) then
+         wgt = 4._r8
+      elseif ( m == id_cfc115 ) then
+         wgt = 5._r8
+      else
+         wgt = 1._r8
+      endif
+      if ( any( foy_species == m ) ) then
+         vmr_foy(:ncol,:) = vmr_foy(:ncol,:) +  wgt * vmr(:ncol,:,m)
+      endif
+      if ( any( tfy_species == m ) ) then
+         vmr_tfy(:ncol,:) = vmr_tfy(:ncol,:) +  wgt * vmr(:ncol,:,m)
+      endif
 
 !... counting chlorine and bromines, etc... (and total H2 species)
-       if ( m == id_ch4 .or. m == id_n2o5 .or. m == id_cfc12 .or. m == id_cl2 .or. m == id_cl2o2 .or. m==id_h2o2  ) then
-          wgt = 2._r8
-       elseif (m == id_cfc114 .or. m == id_hcfc141b .or. m == id_h1202 .or. m == id_h2402 .or. m == id_ch2br2 ) then
-          wgt = 2._r8
-       elseif ( m == id_cfc11 .or. m == id_cfc113 .or. m == id_ch3ccl3 .or. m == id_chbr3 ) then
-          wgt = 3._r8
-       elseif ( m == id_ccl4 ) then
-          wgt = 4._r8
-       else
-          wgt = 1._r8
-       endif
+      if ( m == id_ch4 .or. m == id_n2o5 .or. m == id_cfc12 .or. m == id_cl2 .or. m == id_cl2o2 .or. m==id_h2o2  ) then
+         wgt = 2._r8
+      elseif (m == id_cfc114 .or. m == id_hcfc141b .or. m == id_h1202 .or. m == id_h2402 .or. m == id_ch2br2 ) then
+         wgt = 2._r8
+      elseif ( m == id_cfc11 .or. m == id_cfc113 .or. m == id_ch3ccl3 .or. m == id_chbr3 ) then
+         wgt = 3._r8
+      elseif ( m == id_ccl4 ) then
+         wgt = 4._r8
+      else
+         wgt = 1._r8
+      endif
 !...NOY
-       if ( any( nox_species == m ) ) then
-          vmr_nox(:ncol,:) = vmr_nox(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
-       if ( any( noy_species == m ) ) then
-          vmr_noy(:ncol,:) = vmr_noy(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
+      if ( any( nox_species == m ) ) then
+         vmr_nox(:ncol,:) = vmr_nox(:ncol,:) +  wgt * vmr(:ncol,:,m)
+      endif
+      if ( any( noy_species == m ) ) then
+         vmr_noy(:ncol,:) = vmr_noy(:ncol,:) +  wgt * vmr(:ncol,:,m)
+      endif
 !...NOY, SOX, NHX
-       if ( any( noy_species == m ) ) then
-          mmr_noy(:ncol,:) = mmr_noy(:ncol,:) +  wgt * mmr(:ncol,:,m)
-       endif
-       if ( any( sox_species == m ) ) then
-          mmr_sox(:ncol,:) = mmr_sox(:ncol,:) +  wgt * mmr(:ncol,:,m)
-       endif
-       if ( any( nhx_species == m ) ) then
-          mmr_nhx(:ncol,:) = mmr_nhx(:ncol,:) +  wgt * mmr(:ncol,:,m)
-       endif
+      if ( any( noy_species == m ) ) then
+         mmr_noy(:ncol,:) = mmr_noy(:ncol,:) +  wgt * mmr(:ncol,:,m)
+      endif
+      if ( any( sox_species == m ) ) then
+         mmr_sox(:ncol,:) = mmr_sox(:ncol,:) +  wgt * mmr(:ncol,:,m)
+      endif
+      if ( any( nhx_species == m ) ) then
+         mmr_nhx(:ncol,:) = mmr_nhx(:ncol,:) +  wgt * mmr(:ncol,:,m)
+      endif
 !...CLOY
-       if ( any( clox_species == m ) ) then
-          vmr_clox(:ncol,:) = vmr_clox(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
-       if ( any( cloy_species == m ) ) then
-          vmr_cloy(:ncol,:) = vmr_cloy(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
-       if ( any( tcly_species == m ) ) then
-          vmr_tcly(:ncol,:) = vmr_tcly(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
+      if ( any( clox_species == m ) ) then
+         vmr_clox(:ncol,:) = vmr_clox(:ncol,:) +  wgt * vmr(:ncol,:,m)
+      endif
+      if ( any( cloy_species == m ) ) then
+         vmr_cloy(:ncol,:) = vmr_cloy(:ncol,:) +  wgt * vmr(:ncol,:,m)
+      endif
+      if ( any( tcly_species == m ) ) then
+         vmr_tcly(:ncol,:) = vmr_tcly(:ncol,:) +  wgt * vmr(:ncol,:,m)
+      endif
 !...BROY
-       if ( any( brox_species == m ) ) then
-          vmr_brox(:ncol,:) = vmr_brox(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
-       if ( any( broy_species == m ) ) then
-          vmr_broy(:ncol,:) = vmr_broy(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
-       if ( any( tbry_species == m ) ) then
-          vmr_tbry(:ncol,:) = vmr_tbry(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
+      if ( any( brox_species == m ) ) then
+         vmr_brox(:ncol,:) = vmr_brox(:ncol,:) +  wgt * vmr(:ncol,:,m)
+      endif
+      if ( any( broy_species == m ) ) then
+         vmr_broy(:ncol,:) = vmr_broy(:ncol,:) +  wgt * vmr(:ncol,:,m)
+      endif
+      if ( any( tbry_species == m ) ) then
+         vmr_tbry(:ncol,:) = vmr_tbry(:ncol,:) +  wgt * vmr(:ncol,:,m)
+      endif
 !...HOY
-       if ( any ( toth_species == m ) ) then
-          vmr_toth(:ncol,:) = vmr_toth(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
+      if ( any ( toth_species == m ) ) then
+         vmr_toth(:ncol,:) = vmr_toth(:ncol,:) +  wgt * vmr(:ncol,:,m)
+      endif
 !...HOx
-       if ( any( hox_species == m ) ) then
-          vmr_hox(:ncol,:) = vmr_hox(:ncol,:) +  wgt * vmr(:ncol,:,m)
-       endif
+      if ( any( hox_species == m ) ) then
+         vmr_hox(:ncol,:) = vmr_hox(:ncol,:) +  wgt * vmr(:ncol,:,m)
+      endif
 
-       ! OSLO_AERO begin
-       spc_name = trim(solsym(m))
-       call cnst_get_ind(spc_name, n, abort=.false.)
+      ! OSLO_AERO begin
+      spc_name = trim(solsym(m))
+      call cnst_get_ind(spc_name, n, abort=.false.)
 
-       ! output surface mmr and vmr
-       if (n.gt.0) then
-          if ( any( aer_species == m ) .or. isAerosol(n) ) then
-             call outfld( solsym(m), mmr(:ncol,:,m), ncol ,lchnk )
-             call outfld( trim(solsym(m))//'_SRF', mmr(:ncol,pver,m), ncol ,lchnk )
-          else
-             call outfld( solsym(m), vmr(:ncol,:,m), ncol ,lchnk )
-             call outfld( trim(solsym(m))//'_SRF', vmr(:ncol,pver,m), ncol ,lchnk )
-          endif
-       else
-          call outfld( solsym(m), vmr(:ncol,:,m), ncol ,lchnk )
-          call outfld( trim(solsym(m))//'_SRF', vmr(:ncol,pver,m), ncol ,lchnk )
-       end if
+      ! output surface mmr and vmr
+      if (n.gt.0) then
+         if ( any( aer_species == m ) .or. isAerosol(n) ) then
+            call outfld( solsym(m), mmr(:ncol,:,m), ncol ,lchnk )
+            call outfld( trim(solsym(m))//'_SRF', mmr(:ncol,pver,m), ncol ,lchnk )
+         else
+            call outfld( solsym(m), vmr(:ncol,:,m), ncol ,lchnk )
+            call outfld( trim(solsym(m))//'_SRF', vmr(:ncol,pver,m), ncol ,lchnk )
+         endif
+      else
+         call outfld( solsym(m), vmr(:ncol,:,m), ncol ,lchnk )
+         call outfld( trim(solsym(m))//'_SRF', vmr(:ncol,pver,m), ncol ,lchnk )
+      end if
 
-       if (n > 0) then
+      if (n > 0) then
          cloudTracerIndex_direct = getCloudTracerIndexDirect(n)
          if (cloudTracerIndex_direct > 0)then
             cloudTracerName = getCloudTracerName(n)
@@ -820,20 +820,25 @@ contains
             call outfld(trim('cb_'//trim(cloudTracerName)), cb, pcols, lchnk)
          endif
 
+         ! Add the column burden of the cloud tracer to the aerosol type cb
+         if (aerosolType(n) .gt. 0) then
+            cb_aerosol_type(:ncol,aerosolType(n)) = cb_aerosol_type(:ncol,aerosolType(n)) + cb(:ncol)
+         endif
+
          !Treat column burden (normal tracer)
          mass_tmp(:ncol,:) = mmr(:ncol,:,m) * pdel(:ncol,:) * rgrav
          cb(:ncol) = sum(mass_tmp(:ncol,:),2)
          call outfld(trim('cb_'//trim(spc_name)), cb, pcols, lchnk)
 
-         ! Sum column burden per aerosol type
-         if(aerosolType(n) .gt. 0)then
+         ! Add the column burden and mass mixing ratio of the interstitial tracers to the aerosol type cb and mmr
+         if (aerosolType(n) .gt. 0) then
             cb_aerosol_type(:ncol,aerosolType(n)) = cb_aerosol_type(:ncol,aerosolType(n)) + cb(:ncol)
-
             !Total mass mixing ratio of aerosol type
             mmr_aerosol_type(:ncol,:,aerosolType(n)) = mmr_aerosol_type(:ncol,:,aerosolType(n)) + mmr(:ncol,:,m)
          endif
-       end if !Check if this is a chemistry tracer
-       ! OSLO_AERO end
+
+      endif !Check if this is a chemistry tracer
+      ! OSLO_AERO end
 
        call outfld( depvel_name(m), depvel(:ncol,m), ncol ,lchnk )
        call outfld( depflx_name(m), depflx(:ncol,m), ncol ,lchnk )
