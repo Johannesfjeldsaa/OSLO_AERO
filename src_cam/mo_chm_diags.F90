@@ -71,6 +71,10 @@ contains
     ! OSLO_AERO begin
     use oslo_aero_share, only: getCloudTracerIndexDirect, getCloudTracerName, isAerosol
     use oslo_aero_share, only: aerosol_type_name, N_AEROSOL_TYPES
+    use phys_control,    only: history_aerosol_base,        &
+                               history_aerosol_decomposed,  &   
+                               history_gas
+
     ! OSLO_AERO end
 
     integer :: j, k, m, n
@@ -105,9 +109,6 @@ contains
     integer :: bulkaero_species(20)
     logical :: history_dust
     ! OSLO_AERO begin
-    logical :: history_aerosol_base
-    logical :: history_aerosol_decomposed
-    logical :: history_gas
     integer :: cloudTracerIndex_direct
     character(len=20) :: cloudTracerName
     ! OSLO_AERO end
@@ -119,10 +120,7 @@ contains
                        history_chemspecies_srf_out = history_chemspecies_srf, &
                        history_cesm_forcing_out = history_cesm_forcing, &
                        history_scwaccm_forcing_out = history_scwaccm_forcing, &
-                       history_dust_out = history_dust, &
-                       history_aerosol_base_out = history_aerosol_base, &              ! OSLO_AERO begin
-                       history_aerosol_decomposed_out = history_aerosol_decomposed, &
-                       history_gas_out = history_gas )       ! OSLO_AERO end
+                       history_dust_out = history_dust ) 
 
 
     id_bry     = get_spc_ndx( 'BRY' )
@@ -402,7 +400,7 @@ contains
        call addfld( wetdep_name_area(m), horiz_only, 'A', 'kg/m2/s ', spc_name//' wet deposition' )
 
        !Needed for budget term of gases! Aerosols have their own budget terms
-       if (n.gt.0) then
+       if (n > 0) then
           if(.NOT. isAerosol(n))then
             if(history_chemistry)then
               call add_default( wetdep_name_area(m), 1, ' ')
@@ -418,7 +416,7 @@ contains
        endif
 
        ! OSLO_AERO begin
-       if (n.gt.0) then
+       if (n > 0) then
           if ( any( aer_species == m ) .or. isAerosol(n) ) then
              call addfld( spc_name,   (/ 'lev' /), 'A', unit_basename//'/kg ', trim(attr)//' concentration')
              call addfld( trim(spc_name)//'_SRF', horiz_only, 'A', unit_basename//'/kg', trim(attr)//" in bottom layer")
@@ -480,7 +478,7 @@ contains
             if ( history_aerosol_decomposed ) then
                call add_default( spc_name, 1, ' ' )
             endif
-         ! if it is not an aerosol species it is a gas species and we then require the history_gas flagg
+         ! if it is not an aerosol species it is a gas species and we then require the history_gas flag
          else 
             if ( history_gas ) then 
                call add_default( spc_name, 1, ' ' )
@@ -497,7 +495,6 @@ contains
          cloudTracerIndex_direct = getCloudTracerIndexDirect(n)
          if ( cloudTracerIndex_direct > 0 ) then
             ! first the 3d fields, 
-            cloudTracerName(1:len(CloudTracerName))=" "
             cloudTracerName = getCloudTracerName(n)
             call addfld( trim(cloudTracerName), (/'lev'/), 'A','kg/kg', &
                trim(cloudTracerName)//' in cloud water')
@@ -517,12 +514,12 @@ contains
          call addfld('cb_'//trim(spc_name),horiz_only, 'A', 'kg/m2', &
             'cb_'//trim(spc_name)//' in column')
 
-         ! if the species is an aerosol we require history_aerosol_decomposed flagg
+         ! if the species is an aerosol we require history_aerosol_decomposed flag
          if ( any( aer_species == m ) .or. isAerosol(n) ) then
             if ( history_aerosol_decomposed ) then
                call add_default('cb_'//trim(spc_name),1,' ' )
             endif
-         ! else, if it is a gasphase the cb is included in the base so we require history_aerosol_base flagg
+         ! else, if it is a gasphase the cb is included in the base so we require history_aerosol_base flag
          else 
             if ( history_aerosol_base ) then 
                call add_default('cb_'//trim(spc_name), 1, ' ')
@@ -555,14 +552,14 @@ contains
       ! add the column burden of the compound aerosols to output
       call addfld('cb_'//trim(aerosol_type_name(n)),horiz_only, 'A', 'kg/m2',&
          'cb_'//trim(aerosol_type_name(n))//' column of aerosol type')
-      ! we require history_aerosol_base flagg
+      ! we require history_aerosol_base flag
       if ( history_aerosol_base ) then 
          call add_default('cb_'//trim(aerosol_type_name(n)), 1, ' ')
       endif
       ! add the mass mixing ratio of the compound aerosols to output
       call addfld('mmr_'//trim(aerosol_type_name(n)),(/'lev'/),'A','kg/kg' ,&
          'mmr_'//trim(aerosol_type_name(n))//' mmr of aerosol type')
-      ! we require history_aerosol_base flagg
+      ! we require history_aerosol_base flag
       if ( history_aerosol_base ) then
          call add_default('mmr_'//trim(aerosol_type_name(n)), 1, ' ')
       endif
@@ -794,7 +791,7 @@ contains
       call cnst_get_ind(spc_name, n, abort=.false.)
 
       ! output surface mmr and vmr
-      if (n.gt.0) then
+      if (n > 0) then
          if ( any( aer_species == m ) .or. isAerosol(n) ) then
             call outfld( solsym(m), mmr(:ncol,:,m), ncol ,lchnk )
             call outfld( trim(solsym(m))//'_SRF', mmr(:ncol,pver,m), ncol ,lchnk )
@@ -821,7 +818,7 @@ contains
          endif
 
          ! Add the column burden of the cloud tracer to the aerosol type cb
-         if (aerosolType(n) .gt. 0) then
+         if (aerosolType(n) > 0) then
             cb_aerosol_type(:ncol,aerosolType(n)) = cb_aerosol_type(:ncol,aerosolType(n)) + cb(:ncol)
          endif
 
@@ -831,7 +828,7 @@ contains
          call outfld(trim('cb_'//trim(spc_name)), cb, pcols, lchnk)
 
          ! Add the column burden and mass mixing ratio of the interstitial tracers to the aerosol type cb and mmr
-         if (aerosolType(n) .gt. 0) then
+         if (aerosolType(n) > 0) then
             cb_aerosol_type(:ncol,aerosolType(n)) = cb_aerosol_type(:ncol,aerosolType(n)) + cb(:ncol)
             !Total mass mixing ratio of aerosol type
             mmr_aerosol_type(:ncol,:,aerosolType(n)) = mmr_aerosol_type(:ncol,:,aerosolType(n)) + mmr(:ncol,:,m)

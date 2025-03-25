@@ -8,6 +8,7 @@ module mo_gas_phase_chemdr
   use chem_mods,        only : rxt_tag_cnt, rxt_tag_lst, rxt_tag_map, extcnt, num_rnts
   ! OSLO_AERO begin
   use oslo_aero_dust,   only : dust_names, ndust => dust_nbin
+  use phys_control,     only : history_aerosol_forcing
   ! OSLO_AERO end
   use ppgrid,           only : pcols, pver
   use phys_control,     only : phys_getopts
@@ -29,7 +30,6 @@ module mo_gas_phase_chemdr
   integer :: ndx_cldfr, ndx_cmfdqr, ndx_nevapr, ndx_cldtop, ndx_prain
   integer :: ndx_h2so4
   ! OSLO_AERO begin
-  logical :: history_aerosol_forcing            ! history flagg for forcing diagnostic output
   logical :: inv_o3, inv_oh, inv_no3, inv_ho2
   integer :: id_o3, id_oh, id_no3, id_ho2
   ! OSLO_AERO end
@@ -80,9 +80,6 @@ contains
     !-----------------------------------------------------------------------
     logical :: history_scwaccm_forcing
     
-    ! OSLO_AERO begin
-    call phys_getopts( history_aerosol_forcing_out = history_aerosol_forcing )
-    ! OSLO_AERO end
     call phys_getopts( history_scwaccm_forcing_out = history_scwaccm_forcing )
 
     call phys_getopts( convproc_do_aer_out = convproc_do_aer, history_cesm_forcing_out=history_cesm_forcing )

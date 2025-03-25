@@ -126,13 +126,15 @@ contains
   !===============================================================================
   subroutine oslo_aero_ocean_init()
 
+    
+    use phys_control,   only : history_aerosol_forcing
+
     ! local variables
     integer  :: astat
     integer  :: m
     integer            :: cycle_yr(2)
     character(len=32)  :: data_type(2)
     character(len=16)  :: emis_species(2)
-    logical            :: history_aerosol_forcing
 
     ! Collect and save namelist information in module
     call oslo_aero_ocean_getnl()
@@ -184,8 +186,6 @@ contains
             oceanspcs(m)%fields, oceanspcs(m)%file, rmv_file, &
             cycle_yr(m), fixed_ymd, fixed_tod, data_type(m) )
     enddo
-
-    call phys_getopts( history_aerosol_forcing_out = history_aerosol_forcing )
     
     call addfld( 'odms', horiz_only,  'A',  'nmol/L', 'DMS upper ocean concentration' )
     if ( history_aerosol_forcing ) then
