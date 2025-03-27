@@ -71,7 +71,7 @@ contains
     ! OSLO_AERO begin
     use oslo_aero_share, only: getCloudTracerIndexDirect, getCloudTracerName, isAerosol
     use oslo_aero_share, only: aerosol_type_name, N_AEROSOL_TYPES, AEROSOL_TYPE_SULFATE
-    use oslo_aero_share  only: l_so2, l_dms
+    use oslo_aero_share, only: l_so2, l_dms
     use phys_control,    only: history_aerosol_base,        &
                                history_aerosol_decomposed,  &   
                                history_gas
