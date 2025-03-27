@@ -1009,8 +1009,6 @@ contains
       use fire_emissions,   only: fire_emissions_srf
       use aero_model,       only: aero_model_emissions
       ! OSLO_AERO begin
-      use mo_tracname,      only: solsym
-      use constituents,     only: cnst_get_ind
       use oslo_aero_share,  only: l_dms, l_isoprene, l_monoterp
       use oslo_aero_share,  only: sulfurMassFraction
       ! OSLO_AERO end
@@ -1071,12 +1069,10 @@ contains
             call outfld( sflxnam(m), cam_in%cflx(:ncol,m), ncol,lchnk )
 
             !OSLO_AERO begin
-            call cnst_get_ind(solsym(m), n2, abort=.false. )
-
-            if ( n2 == l_dms .or. n2 == l_isoprene .or. n2 == l_monoterp) then
-               call outfld('emis_'//trim(solsym(m)), cam_in%cflx(:ncol,m), ncol,lchnk )
-               if ( n2 == l_dms ) then
-                  call outfld('emis_'//trim(solsym(m)), ( cam_in%cflx(:ncol,m) * sulfurMassFraction(n2) ), ncol,lchnk )
+            if ( m == l_dms .or. m == l_isoprene .or. m == l_monoterp) then
+               call outfld('emis_'//trim(sflxnam(m)(3:)), cam_in%cflx(:ncol,m), ncol,lchnk )
+               if ( m == l_dms ) then
+                  call outfld('emis_'//trim(sflxnam(m)(3:)), ( cam_in%cflx(:ncol,m) * sulfurMassFraction(m) ), ncol,lchnk )
                endif
             endif
             !OSLO_AERO end
