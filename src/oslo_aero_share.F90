@@ -511,8 +511,6 @@ contains
       sulfurMassFraction(l_so4_ac) = 1.0_r8/3.06_r8
       sulfurMassFraction(l_so4_pr) = 1.0_r8/3.06_r8
 
-      print *, sulfurMassFraction
-
    end subroutine sulfur_mass_fraction_register
 
    !===============================================================================
@@ -524,17 +522,12 @@ contains
       ! gas phase tracers.
       !-----------------------------------------------------------------------
 
-      print*,'Registering SOA mass fractions'
-      print *, 'l_monoterp', l_monoterp
-      print *, 'l_isoprene', l_isoprene
-
       SOAMassFraction(:) = 0.0_r8
       ! for isoprene the SOA mass fraction is assumed ~168/136 since ...
       SOAMassFraction(l_isoprene) = 168.0_r8/68.0_r8
       ! for monoterpenes the SOA mass fraction is assumed ~168/136 since ...
       SOAMassFraction(l_monoterp) = 168.0_r8/136.0_r8
 
-      print *, SOAMassFraction
    end subroutine soa_mass_fraction_register
 
    !=============================================================================
