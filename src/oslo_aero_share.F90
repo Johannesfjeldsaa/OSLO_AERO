@@ -493,14 +493,6 @@ contains
       ! where sulfur is present. Both for the aerosol tracers and the
       ! gas phase tracers.
       !-----------------------------------------------------------------------
-      print*,'Registering sulfur mass fractions'
-      print *, 'l_dms', l_dms
-      print *, 'l_so2', l_so2
-      print *, 'l_so4_a2', l_so4_a2
-      print *, 'l_so4_na', l_so4_na
-      print *, 'l_so4_a1', l_so4_a1
-      print *, 'l_so4_ac', l_so4_ac
-      print *, 'l_so4_pr', l_so4_pr
 
       sulfurMassFraction(:) = 0.0_r8
       ! for dms the sulfur mass fraction is assumed ~32/62=M_S/M_DMS since DMS is CH3SCH3
