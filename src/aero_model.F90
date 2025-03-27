@@ -54,6 +54,7 @@ module aero_model
   use oslo_aero_ocean,          only: oslo_aero_ocean_init, oslo_aero_dms_emis
   use oslo_aero_share,          only: getNumberofTracersInMode, getCloudTracerIndexDirect, getCloudTracerName
   use oslo_aero_share,          only: getCloudTracerName, getTracerIndex, aero_register
+  use oslo_aero_share,          only: sulfur_mass_fraction_register, soa_mass_fraction_register
   use oslo_aero_sox_cldaero,    only: sox_cldaero_init
   use oslo_aero_microp,         only: oslo_aero_microp_readnl
   use oslo_aero_sw_tables,      only: initopt
@@ -135,6 +136,10 @@ contains
   subroutine aero_model_register()
 
     call aero_register()
+    
+    call sulfur_mass_fraction_register()
+
+    call soa_mass_fraction_register()
 
   end subroutine aero_model_register
 
