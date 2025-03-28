@@ -1335,6 +1335,9 @@ contains
       use mo_neu_wetdep,       only : neu_wetdep_tend
       use aerodep_flx,         only : aerodep_flx_prescribed
       use short_lived_species, only : short_lived_species_writeic
+      ! OSLO_AERO begin
+      use oslo_aero_share,     only : summation_fields_writeout
+      ! OSLO_AERO end
 
       implicit none
 
@@ -1456,6 +1459,9 @@ contains
       if (associated(cam_out%noy_nitrogen_flx)) then
          cam_out%noy_nitrogen_flx(:ncol) = noy_nitrogen_flx(:ncol)
       endif
+
+      ! call summation field calculations
+      call summation_fields_writeout( lchnk=state%lchnk )
 
       call t_stopf( 'chemdr' )
 
