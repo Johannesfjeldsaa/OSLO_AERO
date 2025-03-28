@@ -93,6 +93,8 @@ module oslo_aero_depos
   integer :: nevapr_shcu_idx = 0
   integer :: nevapr_dpcu_idx = 0
   integer :: ixcldice, ixcldliq
+  real(r8), private, protected :: sflx_SFWET_SULFATE(pcols)   ! wet deposition flux for SULFATE, for aerosol mass 
+  real(r8), private, protected :: sflx_SFWET_SULFATE_S(pcols) ! wet deposition flux for SULFATE, for sulfur mass only 
 
 !===============================================================================
 contains
@@ -230,23 +232,33 @@ contains
        end do !tracers
     enddo    !modes
    
+   ! addfld and add_default for aerosol type deposition fields
+   ! all will have DDF, sulfate will have SDDF in addition
+   ! all except sulfate will have SFWET.
    do n=1,N_AEROSOL_TYPES
-      ! add the DDF rate of the compound aerosols to output
-      call addfld( trim(aerosol_type_name(n))//'DDF_nw', horiz_only, 'A', unit_basename//'/m2/s ',  &
-           trim(aerosol_type_name(n))//' dry deposition flux at bottom (grav + turb), no weighted sum')
+      
       call addfld( trim(aerosol_type_name(n))//'DDF', horiz_only, 'A', unit_basename//'/m2/s ',  &
            trim(aerosol_type_name(n))//' dry deposition flux at bottom (grav + turb)')
-      ! add the SFWET rate of the compound aerosols to output
-      call addfld(trim(aerosol_type_name(n))//'SFWET_nw', horiz_only, 'A', unit_basename//'/m2/s', &
-           trim(aerosol_type_name(n))//' wet deposition flux at surface, no weighted sum')
-      call addfld(trim(aerosol_type_name(n))//'SFWET', horiz_only, 'A', unit_basename//'/m2/s', &
-           trim(aerosol_type_name(n))//' wet deposition flux at surface')
-      ! we require history_aerosol_base flagg
+
+      if ( aerosolType(n) == AEROSOL_TYPE_SULFATE ) then
+         call addfld( trim(aerosol_type_name(n))//'_SDDF', horiz_only, 'A', unit_basename//'*S/m2/s ',  &
+            trim(aerosol_type_name(n))//' dry deposition flux at bottom (grav + turb), sulfur mass only')
+      else
+         call addfld(trim(aerosol_type_name(n))//'SFWET', horiz_only, 'A', unit_basename//'/m2/s', &
+            trim(aerosol_type_name(n))//' wet deposition flux at surface')
+      endif
+      
+      ! we require history_aerosol_base flag to add the fields to default output
       if ( history_aerosol_base ) then 
-         call add_default(trim(aerosol_type_name(n))//'DDF_nw', 1, ' ')
+
          call add_default(trim(aerosol_type_name(n))//'DDF', 1, ' ')
-         call add_default(trim(aerosol_type_name(n))//'SFWET_nw', 1, ' ')
-         call add_default(trim(aerosol_type_name(n))//'SFWET', 1, ' ')
+
+         if ( aerosolType(n) == AEROSOL_TYPE_SULFATE ) then 
+            call add_default(trim(aerosol_type_name(n))//'_SDDF', 1, ' ')
+         else 
+            call add_default(trim(aerosol_type_name(n))//'SFWET', 1, ' ')
+         endif
+         
       endif
    end do
 
@@ -298,6 +310,9 @@ contains
     type(cam_out_t),     intent(inout) :: cam_out           ! export state
     type(physics_ptend), intent(out)   :: ptend             ! indivdual parameterization tendencies
 
+    ! imports 
+    use oslo_aero_share, only          : sulfurMassFraction
+
     ! local vars
     real(r8) :: fv(pcols)                ! for dry dep velocities, from land modified over ocean & ice
     real(r8) :: ram1(pcols)              ! for dry dep velocities, from land modified over ocean & ice
@@ -313,8 +328,8 @@ contains
     real(r8) :: tvs(pcols,pver)
     real(r8) :: rho(pcols,pver)          ! air density in kg/m3
     real(r8) :: sflx(pcols)              ! deposition flux
-    real(r8) :: sflx_DDF_arosol_type_nw(pcols, N_AEROSOL_TYPES) ! deposition flux for the aerosol types, no weighted sums
-    real(r8) :: sflx_DDF_arosol_type(pcols, N_AEROSOL_TYPES) ! deposition flux for the aerosol types, with weighted sum for SULFATE
+    real(r8) :: sflx_DDF_arosol_type(pcols, N_AEROSOL_TYPES) ! deposition flux for the aerosol types, no weighted sums
+    real(r8) :: sflx_DDF_SULFATE_S(pcols) ! deposition flux for the sulfate aerosol type, sulfur mass only
     real(r8)::  dep_trb(pcols)           ! kg/m2/s
     real(r8)::  dep_grv(pcols)           ! kg/m2/s (total of grav and trb)
     real(r8) :: pvmzaer(pcols,pverp)     ! sedimentation velocity in Pa
@@ -348,8 +363,8 @@ contains
 
     aerdepdryis(:,:)=0._r8
     aerdepdrycw(:,:)=0._r8
-    sflx_DDF_arosol_type_nw(:,:) = 0._r8
     sflx_DDF_arosol_type(:,:) = 0._r8
+    sflx_DDF_SULFATE_S(:) = 0._r8
 
     ! calc ram and fv over ocean and sea ice ...
     call calcram( ncol,landfrac, icefrac, ocnfrac, obklen, &
@@ -565,17 +580,14 @@ contains
              endif
             
             ! accumulate the deposition flux for the aerosol type
-            ! if it is not sulfate we accumulate without weighting
-            sflx_DDF_arosol_type_nw(:, aerosolType(mm)) = sflx_DDF_arosol_type_nw(:, aerosolType(mm)) + sflx(:ncol)
-
-            if ( aerosolType(mm) /=  AEROSOL_TYPE_SULFATE ) then
+            ! All will have a version without weighted sum, that is ...DDF
+            ! sulfate will have a version with weighted sum, that is ...SDDF
+            ! BC_AX is not included in BCDDF
+            if ( mm /= l_bc_ax ) then 
                sflx_DDF_arosol_type(:, aerosolType(mm)) = sflx_DDF_arosol_type(:, aerosolType(mm)) + sflx(:ncol)
-            else ! if it is sulfate we accumulate with weighting, based on fraction of sulfur in the aerosol type
-               if ( mm == l_so4_a2 ) then
-                  sflx_DDF_arosol_type(:, aerosolType(mm)) = sflx_DDF_arosol_type(:, aerosolType(mm)) + ( sflx(:ncol) / 3.59 )
-               else
-                  sflx_DDF_arosol_type(:, aerosolType(mm)) = sflx_DDF_arosol_type(:, aerosolType(mm)) + ( sflx(:ncol) / 3.06 )
-               end if
+            endif 
+            if ( aerosolType(mm) ==  AEROSOL_TYPE_SULFATE ) then
+               sflx_DDF_SULFATE_S(:) = sflx_DDF_SULFATE_S(:) + ( sflx(:ncol) * sulfurMassFraction(mm) )
             endif
 
           enddo   ! lspec = 0, nspec_amode(m)+1
@@ -592,8 +604,10 @@ contains
 
    do n=1,N_AEROSOL_TYPES
       ! add the DDF rate of the compound aerosols to output
-      call outfld(trim(aerosol_type_name(n))//'DDF_nw', sflx_DDF_arosol_type_nw(:ncol,n), ncol, lchnk)
       call outfld(trim(aerosol_type_name(n))//'DDF', sflx_DDF_arosol_type(:ncol,n), ncol, lchnk)
+      if ( aerosolType(n) == AEROSOL_TYPE_SULFATE ) then 
+         call outfld(trim(aerosol_type_name(n))//'_SDDF', sflx_DDF_SULFATE_S(:ncol), ncol, lchnk)
+      endif
    end do
 
   end subroutine oslo_aero_depos_dry
@@ -615,6 +629,9 @@ contains
     type(cam_out_t),     intent(inout) :: cam_out          ! export state
     type(physics_ptend), intent(out)   :: ptend            ! indivdual parameterization tendencies
 
+    ! imports 
+    use oslo_aero_share, only          : sulfurMassFraction
+    
     ! Local variables
     integer  :: m                             ! tracer index
     integer  :: n                             ! aerosol type index
@@ -627,8 +644,7 @@ contains
     real(r8) :: sol_factb, sol_facti
     real(r8) :: sol_factic(pcols,pver)
     real(r8) :: sflx(pcols)                   ! deposition flux
-    real(r8) :: sflx_SFWET_arosol_type_nw(pcols, N_AEROSOL_TYPES) ! deposition flux for the aerosol types, no weighted sums
-    real(r8) :: sflx_SFWET_arosol_type(pcols, N_AEROSOL_TYPES) ! deposition flux for the aerosol types, weighted sum for SULFATE
+    real(r8) :: sflx_SFWET_arosol_type(pcols, N_AEROSOL_TYPES) ! deposition flux for the aerosol types, no weighted sums
     real(r8) :: scavcoef(pcols,pver)          ! Dana and Hales coefficient (/mm) (0.1)
     integer  :: jnv                           ! index for scavcoefnv 3rd dimension
     integer  :: lphase                        ! index for interstitial / cloudborne aerosol
@@ -663,8 +679,9 @@ contains
     is_done(:,:) = .false.
 
     zeroAerosolConcentration(:,:)=0.0_r8
-    sflx_SFWET_arosol_type_nw(:,:) = 0._r8
     sflx_SFWET_arosol_type(:,:) = 0._r8
+    sflx_SFWET_SULFATE(:) = 0._r8
+    sflx_SFWET_SULFATE_S(:) = 0._r8
 
     ! Wet deposition of mozart aerosol species.
     ptend%name  = ptend%name//'+mz_aero_wetdep'
@@ -947,29 +964,31 @@ contains
             else ! lphase == 2
                sflx(:ncol) = aerdepwetcw(:ncol,mm)
             endif
-            
-            ! accumulate the deposition flux for the aerosol type (no weighting FOR DEBBUGGING)
-            sflx_SFWET_arosol_type_nw(:, aerosolType(mm)) = sflx_SFWET_arosol_type_nw(:, aerosolType(mm)) + sflx(:ncol)
 
-            ! if it is not sulfate we accumulate without weighting
-            if ( aerosolType(mm) /=  AEROSOL_TYPE_SULFATE ) then
-               sflx_SFWET_arosol_type(:, aerosolType(mm)) = sflx_SFWET_arosol_type(:, aerosolType(mm)) + sflx(:ncol)
-            else ! if it is sulfate we accumulate with weighting, based on fraction of sulfur in the aerosol type
-               if ( mm == l_so4_a2 ) then
-                  sflx_SFWET_arosol_type(:, aerosolType(mm)) = sflx_SFWET_arosol_type(:, aerosolType(mm)) + ( sflx(:ncol) / 3.59 )
+            ! accumulate the deposition flux for the aerosol type, aerosol mass
+            ! if it is sulfate we accumulate in sflx_SFWET_SULFATE(_S) as 
+            ! opposed to sflx_SFWET_arosol_type, this is because the wet deposition
+            ! of sulfate includes WD_A_H2SO4 and therefor is calculated in 
+            ! another module
+            ! NOTE: BC_AX is not included in BCSFWET
+            if ( mm /= l_bc_ax ) then 
+               if ( aerosolType(mm) == AEROSOL_TYPE_SULFATE ) then
+                  sflx_SFWET_SULFATE(:) = sflx_SFWET_SULFATE(:) + sflx(:ncol)
+                  sflx_SFWET_SULFATE_S(:) = sflx_SFWET_SULFATE_S(:) + ( sflx(:ncol) * sulfurMassFraction(mm) )
                else
-                  sflx_SFWET_arosol_type(:, aerosolType(mm)) = sflx_SFWET_arosol_type(:, aerosolType(mm)) + ( sflx(:ncol) / 3.06 )
-               end if
+                  sflx_SFWET_arosol_type(:, aerosolType(mm)) = sflx_SFWET_arosol_type(:, aerosolType(mm)) + sflx(:ncol)
+               endif
             endif
             
          enddo   ! lspec = 0, nspec_amode(m)+1
       enddo   ! lphase = 1, 2
    enddo   ! m = 1, ntot_amode
 
+   ! add the SFWET rate of the compound aerosols except sulfur to output
    do n=1,N_AEROSOL_TYPES
-      ! add the DDF rate of the compound aerosols to output
-      call outfld(trim(aerosol_type_name(n))//'SFWET_nw', sflx_SFWET_arosol_type_nw(:ncol,n), ncol, lchnk)
-      call outfld(trim(aerosol_type_name(n))//'SFWET', sflx_SFWET_arosol_type(:ncol,n), ncol, lchnk)
+      if ( aerosolType(n) /= AEROSOL_TYPE_SULFATE ) then 
+         call outfld(trim(aerosol_type_name(n))//'SFWET', sflx_SFWET_arosol_type_nw(:ncol,n), ncol, lchnk)
+      endif
    end do
 
     ! if the user has specified prescribed aerosol dep fluxes then
