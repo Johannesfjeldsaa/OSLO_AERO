@@ -283,7 +283,10 @@ contains
        pbuf, obklen, ustar, dt, &
        dgncur_awet, wetdens, dgncur_awet_processmode, wetdens_processmode, &
        cam_out, ptend)
-
+    
+    ! imports 
+    use oslo_aero_share, only          : sulfurMassFraction
+    
     ! Arguments:
     integer  ,           intent(in)    :: lchnk
     integer  ,           intent(in)    :: ncol
@@ -309,9 +312,6 @@ contains
     real(r8),            intent(in)    :: wetdens_processmode(pcols, pver, numberOfProcessModeTracers)
     type(cam_out_t),     intent(inout) :: cam_out           ! export state
     type(physics_ptend), intent(out)   :: ptend             ! indivdual parameterization tendencies
-
-    ! imports 
-    use oslo_aero_share, only          : sulfurMassFraction
 
     ! local vars
     real(r8) :: fv(pcols)                ! for dry dep velocities, from land modified over ocean & ice
@@ -616,6 +616,11 @@ contains
   subroutine oslo_aero_depos_wet ( lchnk, ncol, psetcols, pmid, pdel, q, t, &
        dt, dlf, cam_out, ptend, pbuf)
 
+    
+    ! imports:
+    use oslo_aero_share, only          : sulfurMassFraction
+    
+    ! Arguments:
     integer ,            intent(in)    :: lchnk            ! chunk identifier
     integer ,            intent(in)    :: ncol             ! number of atmospheri columns
     integer ,            intent(in)    :: psetcols
@@ -629,9 +634,6 @@ contains
     type(cam_out_t),     intent(inout) :: cam_out          ! export state
     type(physics_ptend), intent(out)   :: ptend            ! indivdual parameterization tendencies
 
-    ! imports 
-    use oslo_aero_share, only          : sulfurMassFraction
-    
     ! Local variables
     integer  :: m                             ! tracer index
     integer  :: n                             ! aerosol type index
@@ -987,7 +989,7 @@ contains
    ! add the SFWET rate of the compound aerosols except sulfur to output
    do n=1,N_AEROSOL_TYPES
       if ( aerosolType(n) /= AEROSOL_TYPE_SULFATE ) then 
-         call outfld(trim(aerosol_type_name(n))//'SFWET', sflx_SFWET_arosol_type_nw(:ncol,n), ncol, lchnk)
+         call outfld(trim(aerosol_type_name(n))//'SFWET', sflx_SFWET_arosol_type(:ncol,n), ncol, lchnk)
       endif
    end do
 
