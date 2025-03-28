@@ -10,6 +10,7 @@ module oslo_aero_depos
   use ppgrid,                  only: pcols, pver, pverp, begchunk, endchunk
   use constituents,            only: pcnst, cnst_name, cnst_get_ind
   use phys_control,            only: phys_getopts, cam_physpkg_is
+  use phys_control,            only: history_aerosol_base, history_aerosol_decomposed
   use cam_abortutils,          only: endrun
   use cam_logfile,             only: iulog
   use camsrfexch,              only: cam_out_t
@@ -28,6 +29,7 @@ module oslo_aero_depos
   use oslo_aero_share,         only: is_process_mode, processModeMap, processModeSigma, lifeCycleSigma
   use oslo_aero_share,         only: belowCloudScavengingCoefficientProcessModes, belowCloudScavengingCoefficient
   use oslo_aero_share,         only: getCloudTracerIndex, GetCloudTracerIndexDirect, getCloudTracerName, qqcw_get_field
+  use oslo_aero_share,         only: aerosol_type_name, N_AEROSOL_TYPES, aerosolType, AEROSOL_TYPE_SULFATE
   use oslo_aero_share,         only: l_bc_ax, l_bc_ni, l_bc_ai, l_bc_a, l_bc_ac
   use oslo_aero_share,         only: l_bc_n, l_om_ni, l_om_ai, l_om_ac, l_dst_a2, l_dst_a3
   use oslo_aero_share,         only: l_ss_a2, l_ss_a3, l_so4_a2
@@ -104,7 +106,7 @@ contains
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
     ! local variables
-    integer            :: m, l, i
+    integer            :: m, l, i, n
     integer            :: lchnk
     integer            :: tracerIndex
     integer            :: astat, id
@@ -162,12 +164,16 @@ contains
 
           ! Extra wd ouptut
           if ( history_aerosol ) then
-             call add_default (trim(aName)//'SFWET', 1, ' ')
              call add_default (trim(aName)//'SFSIC', 1, ' ')
              call add_default (trim(aName)//'SFSIS', 1, ' ')
              call add_default (trim(aName)//'SFSBC', 1, ' ')
              call add_default (trim(aName)//'SFSBS', 1, ' ')
           endif
+
+          if ( history_aerosol .or. history_aerosol_decomposed ) then
+             call add_default (trim(aName)//'SFWET', 1, ' ')
+          endif
+
 
           ! Dry deposition fluxes and velocity
           call addfld (trim(aName)//'DDF',horiz_only, 'A', unit_basename//'/m2/s ', &
@@ -183,10 +189,13 @@ contains
 
           ! extra drydep output
           if ( history_aerosol ) then
-             call add_default (trim(aName)//'DDF', 1, ' ')
              call add_default (trim(aName)//'TBF', 1, ' ')
              call add_default (trim(aName)//'GVF', 1, ' ')
              !call add_default (trim(aName)//'DDV', 1, ' ')
+          endif
+
+          if ( history_aerosol .or. history_aerosol_decomposed ) then
+             call add_default (trim(aName)//'DDF', 1, ' ')
           endif
 
           ! some tracers are not in cloud water
@@ -220,6 +229,26 @@ contains
 
        end do !tracers
     enddo    !modes
+   
+   do n=1,N_AEROSOL_TYPES
+      ! add the DDF rate of the compound aerosols to output
+      call addfld( trim(aerosol_type_name(n))//'DDF_nw', horiz_only, 'A', unit_basename//'/m2/s ',  &
+           trim(aerosol_type_name(n))//' dry deposition flux at bottom (grav + turb), no weighted sum')
+      call addfld( trim(aerosol_type_name(n))//'DDF', horiz_only, 'A', unit_basename//'/m2/s ',  &
+           trim(aerosol_type_name(n))//' dry deposition flux at bottom (grav + turb)')
+      ! add the SFWET rate of the compound aerosols to output
+      call addfld(trim(aerosol_type_name(n))//'SFWET_nw', horiz_only, 'A', unit_basename//'/m2/s', &
+           trim(aerosol_type_name(n))//' wet deposition flux at surface, no weighted sum')
+      call addfld(trim(aerosol_type_name(n))//'SFWET', horiz_only, 'A', unit_basename//'/m2/s', &
+           trim(aerosol_type_name(n))//' wet deposition flux at surface')
+      ! we require history_aerosol_base flagg
+      if ( history_aerosol_base ) then 
+         call add_default(trim(aerosol_type_name(n))//'DDF_nw', 1, ' ')
+         call add_default(trim(aerosol_type_name(n))//'DDF', 1, ' ')
+         call add_default(trim(aerosol_type_name(n))//'SFWET_nw', 1, ' ')
+         call add_default(trim(aerosol_type_name(n))//'SFWET', 1, ' ')
+      endif
+   end do
 
     !initialize cloud concentrations (initialize cloud bourne constituents in physics buffer)
     if (is_first_step()) then
@@ -277,12 +306,15 @@ contains
     integer :: lphase                    ! index for interstitial / cloudborne aerosol
     integer :: lspec                     ! index for aerosol number / chem-mass / water-mass
     integer :: m                         ! aerosol mode index
+    integer :: n                         ! aerosol type index
     integer :: mm                        ! tracer index
     integer :: i
 
     real(r8) :: tvs(pcols,pver)
     real(r8) :: rho(pcols,pver)          ! air density in kg/m3
     real(r8) :: sflx(pcols)              ! deposition flux
+    real(r8) :: sflx_DDF_arosol_type_nw(pcols, N_AEROSOL_TYPES) ! deposition flux for the aerosol types, no weighted sums
+    real(r8) :: sflx_DDF_arosol_type(pcols, N_AEROSOL_TYPES) ! deposition flux for the aerosol types, with weighted sum for SULFATE
     real(r8)::  dep_trb(pcols)           ! kg/m2/s
     real(r8)::  dep_grv(pcols)           ! kg/m2/s (total of grav and trb)
     real(r8) :: pvmzaer(pcols,pverp)     ! sedimentation velocity in Pa
@@ -316,6 +348,8 @@ contains
 
     aerdepdryis(:,:)=0._r8
     aerdepdrycw(:,:)=0._r8
+    sflx_DDF_arosol_type_nw(:,:) = 0._r8
+    sflx_DDF_arosol_type(:,:) = 0._r8
 
     ! calc ram and fv over ocean and sea ice ...
     call calcram( ncol,landfrac, icefrac, ocnfrac, obklen, &
@@ -523,13 +557,26 @@ contains
                 enddo
 
                 fldcw(1:ncol,:) = fldcw(1:ncol,:) + dqdt_tmp(1:ncol,:) * dt
-
                 call outfld( trim(getCloudTracerName(mm))//'DDF', sflx(:ncol), ncol, lchnk)
                 call outfld( trim(getCloudTracerName(mm))//'TBF', dep_trb(:ncol), ncol, lchnk )
                 call outfld( trim(getCloudTracerName(mm))//'GVF', dep_grv(:ncol), ncol, lchnk )
                 aerdepdrycw(:ncol,mm) = sflx(:ncol)
 
              endif
+            
+            ! accumulate the deposition flux for the aerosol type
+            ! if it is not sulfate we accumulate without weighting
+            sflx_DDF_arosol_type_nw(:, aerosolType(mm)) = sflx_DDF_arosol_type_nw(:, aerosolType(mm)) + sflx(:ncol)
+
+            if ( aerosolType(mm) /=  AEROSOL_TYPE_SULFATE ) then
+               sflx_DDF_arosol_type(:, aerosolType(mm)) = sflx_DDF_arosol_type(:, aerosolType(mm)) + sflx(:ncol)
+            else ! if it is sulfate we accumulate with weighting, based on fraction of sulfur in the aerosol type
+               if ( mm == l_so4_a2 ) then
+                  sflx_DDF_arosol_type(:, aerosolType(mm)) = sflx_DDF_arosol_type(:, aerosolType(mm)) + ( sflx(:ncol) / 3.59 )
+               else
+                  sflx_DDF_arosol_type(:, aerosolType(mm)) = sflx_DDF_arosol_type(:, aerosolType(mm)) + ( sflx(:ncol) / 3.06 )
+               end if
+            endif
 
           enddo   ! lspec = 0, nspec_amode(m)+1
        enddo   ! lphase = 1, 2
@@ -542,6 +589,12 @@ contains
             cam_out%bcphidry, cam_out%bcphodry, cam_out%ocphidry, cam_out%ocphodry, &
             cam_out%dstdry1, cam_out%dstdry2, cam_out%dstdry3, cam_out%dstdry4)
     endif
+
+   do n=1,N_AEROSOL_TYPES
+      ! add the DDF rate of the compound aerosols to output
+      call outfld(trim(aerosol_type_name(n))//'DDF_nw', sflx_DDF_arosol_type_nw(:ncol,n), ncol, lchnk)
+      call outfld(trim(aerosol_type_name(n))//'DDF', sflx_DDF_arosol_type(:ncol,n), ncol, lchnk)
+   end do
 
   end subroutine oslo_aero_depos_dry
 
@@ -564,6 +617,7 @@ contains
 
     ! Local variables
     integer  :: m                             ! tracer index
+    integer  :: n                             ! aerosol type index
     integer  :: i,k,mm
     real(r8) :: iscavt(pcols, pver)
     real(r8) :: icscavt(pcols, pver)
@@ -573,6 +627,8 @@ contains
     real(r8) :: sol_factb, sol_facti
     real(r8) :: sol_factic(pcols,pver)
     real(r8) :: sflx(pcols)                   ! deposition flux
+    real(r8) :: sflx_SFWET_arosol_type_nw(pcols, N_AEROSOL_TYPES) ! deposition flux for the aerosol types, no weighted sums
+    real(r8) :: sflx_SFWET_arosol_type(pcols, N_AEROSOL_TYPES) ! deposition flux for the aerosol types, weighted sum for SULFATE
     real(r8) :: scavcoef(pcols,pver)          ! Dana and Hales coefficient (/mm) (0.1)
     integer  :: jnv                           ! index for scavcoefnv 3rd dimension
     integer  :: lphase                        ! index for interstitial / cloudborne aerosol
@@ -607,6 +663,8 @@ contains
     is_done(:,:) = .false.
 
     zeroAerosolConcentration(:,:)=0.0_r8
+    sflx_SFWET_arosol_type_nw(:,:) = 0._r8
+    sflx_SFWET_arosol_type(:,:) = 0._r8
 
     ! Wet deposition of mozart aerosol species.
     ptend%name  = ptend%name//'+mz_aero_wetdep'
@@ -635,253 +693,284 @@ contains
 
     scavcoefnv(:,:,0) = 0.0_r8   ! below-cloud scavcoef = 0.0 for cloud-borne species
 
-    do m = 0, nmodes  ! main loop over aerosol modes
+   do m = 0, nmodes  ! main loop over aerosol modes
 
-       do lphase = 1, 2   ! loop over interstitial (1) and cloud-borne (2) forms
+      do lphase = 1, 2   ! loop over interstitial (1) and cloud-borne (2) forms
 
-          ! sol_factb and sol_facti values
-          ! sol_factb - currently this is basically a tuning factor
-          ! sol_facti & sol_factic - currently has a physical basis, and reflects activation fraction
-          !
-          ! 2008-mar-07 rce - sol_factb (interstitial) changed from 0.3 to 0.1
-          ! - sol_factic (interstitial, dust modes) changed from 1.0 to 0.5
-          ! - sol_factic (cloud-borne, pcarb modes) no need to set it to 0.0
-          ! because the cloud-borne pcarbon == 0 (no activation)
-          !
-          ! rce 2010/05/02
-          ! prior to this date, sol_factic was used for convective in-cloud wet removal,
-          ! and its value reflected a combination of an activation fraction (which varied between modes)
-          ! and a tuning factor
-          ! from this date forward, two parameters are used for convective in-cloud wet removal
-          ! f_act_conv is the activation fraction
-          ! note that "non-activation" of aerosol in air entrained into updrafts should
-          ! be included here
-          ! eventually we might use the activate routine (with w ~= 1 m/s) to calculate
-          ! this, but there is still the entrainment issue
-          ! sol_factic is strictly a tuning factor
-          !
-          if (lphase == 1) then   ! interstial aerosol
-             !hygro_sum_old(:,:) = 0.0_r8
-             !hygro_sum_del(:,:) = 0.0_r8
-             !call modal_aero_bcscavcoef_get( m, ncol, isprx, dgncur_awet, scavcoefnv(:,:,1), scavcoefnv(:,:,2) )
+         ! sol_factb and sol_facti values
+         ! sol_factb - currently this is basically a tuning factor
+         ! sol_facti & sol_factic - currently has a physical basis, and reflects activation fraction
+         !
+         ! 2008-mar-07 rce - sol_factb (interstitial) changed from 0.3 to 0.1
+         ! - sol_factic (interstitial, dust modes) changed from 1.0 to 0.5
+         ! - sol_factic (cloud-borne, pcarb modes) no need to set it to 0.0
+         ! because the cloud-borne pcarbon == 0 (no activation)
+         !
+         ! rce 2010/05/02
+         ! prior to this date, sol_factic was used for convective in-cloud wet removal,
+         ! and its value reflected a combination of an activation fraction (which varied between modes)
+         ! and a tuning factor
+         ! from this date forward, two parameters are used for convective in-cloud wet removal
+         ! f_act_conv is the activation fraction
+         ! note that "non-activation" of aerosol in air entrained into updrafts should
+         ! be included here
+         ! eventually we might use the activate routine (with w ~= 1 m/s) to calculate
+         ! this, but there is still the entrainment issue
+         ! sol_factic is strictly a tuning factor
+         !
+         if (lphase == 1) then   ! interstial aerosol
+            !hygro_sum_old(:,:) = 0.0_r8
+            !hygro_sum_del(:,:) = 0.0_r8
+            !call modal_aero_bcscavcoef_get( m, ncol, isprx, dgncur_awet, scavcoefnv(:,:,1), scavcoefnv(:,:,2) )
 
-             scavcoefnv(:,:,1) = 0.1_r8  !Used by MAM for number concentration
+            scavcoefnv(:,:,1) = 0.1_r8  !Used by MAM for number concentration
 
-             sol_factb  = 0.1_r8   ! all below-cloud scav ON (0.1 "tuning factor")
-             ! sol_factb  = 0.03_r8   ! all below-cloud scav ON (0.1 "tuning factor")  ! tuned 1/6
+            sol_factb  = 0.1_r8   ! all below-cloud scav ON (0.1 "tuning factor")
+            ! sol_factb  = 0.03_r8   ! all below-cloud scav ON (0.1 "tuning factor")  ! tuned 1/6
 
-             sol_facti  = 0.0_r8   ! strat  in-cloud scav totally OFF for institial
+            sol_facti  = 0.0_r8   ! strat  in-cloud scav totally OFF for institial
 
-             sol_factic = 0.4_r8      ! xl 2010/05/20
+            sol_factic = 0.4_r8      ! xl 2010/05/20
 
-             !fxm: simplified relative to MAM
-             f_act_conv = 0.8 !ag: Introduce tuning per component later
-          else   ! cloud-borne aerosol (borne by stratiform cloud drops)
-             !default 100 % is scavenged by cloud -borne
-             sol_facti_cloud_borne = 1.0_r8
+            !fxm: simplified relative to MAM
+            f_act_conv = 0.8 !ag: Introduce tuning per component later
+         else   ! cloud-borne aerosol (borne by stratiform cloud drops)
+            !default 100 % is scavenged by cloud -borne
+            sol_facti_cloud_borne = 1.0_r8
 
-             sol_factb  = 0.0_r8                ! all below-cloud scav OFF (anything cloud-borne is located "in-cloud")
-             sol_facti  = sol_facti_cloud_borne ! strat  in-cloud scav cloud-borne tuning factor
-             sol_factic = 0.0_r8                ! conv   in-cloud scav OFF (having this on would mean
-             !        that conv precip collects strat droplets)
-             f_act_conv = 0.0_r8                ! conv   in-cloud scav OFF (having this on would mean
-          end if
+            sol_factb  = 0.0_r8                ! all below-cloud scav OFF (anything cloud-borne is located "in-cloud")
+            sol_facti  = sol_facti_cloud_borne ! strat  in-cloud scav cloud-borne tuning factor
+            sol_factic = 0.0_r8                ! conv   in-cloud scav OFF (having this on would mean
+            !        that conv precip collects strat droplets)
+            f_act_conv = 0.0_r8                ! conv   in-cloud scav OFF (having this on would mean
+         end if
 
-          if (convproc_do_aer .and. lphase == 1) then
-             ! if modal aero convproc is turned on for aerosols, then
-             !    turn off the convective in-cloud removal for interstitial aerosols
-             !    (but leave the below-cloud on, as convproc only does in-cloud)
-             !    and turn off the outfld SFWET, SFSIC, SFSID, SFSEC, and SFSED calls
-             ! for (stratiform)-cloudborne aerosols, convective wet removal
-             !    (all forms) is zero, so no action is needed
-             sol_factic = 0.0_r8
-          endif
+         if (convproc_do_aer .and. lphase == 1) then
+            ! if modal aero convproc is turned on for aerosols, then
+            !    turn off the convective in-cloud removal for interstitial aerosols
+            !    (but leave the below-cloud on, as convproc only does in-cloud)
+            !    and turn off the outfld SFWET, SFSIC, SFSID, SFSEC, and SFSED calls
+            ! for (stratiform)-cloudborne aerosols, convective wet removal
+            !    (all forms) is zero, so no action is needed
+            sol_factic = 0.0_r8
+         endif
 
-          do lspec = 1,getNumberOfTracersInMode(m)   ! loop over number + chem constituents + water
-             mm = getTracerIndex(m,lspec,.false.)
-             if(is_done(mm,lphase)) then
-                cycle
-             endif
-             is_done(mm,lphase)=.true.
+         do lspec = 1,getNumberOfTracersInMode(m)   ! loop over number + chem constituents + water
+            mm = getTracerIndex(m,lspec,.false.)
+            if(is_done(mm,lphase)) then
+               cycle
+            endif
+            is_done(mm,lphase)=.true.
 
-             if (lphase == 1) then
-                jnv = 2
-                !Set correct below cloud scaveing coefficients
-                !Hard-coded values per mode in NorESM
-                if(is_process_mode(mm,.FALSE.))then
-                   scavcoefnv(:,:,jnv) = belowCloudScavengingCoefficientProcessModes(processModeMap(mm))
-                else
-                   scavcoefnv(:,:,jnv) = belowCloudScavengingCoefficient(m)
-                end if
-             else
-                jnv = 0  !==> below cloud scavenging coefficients are zero (see above)
-             endif
+            if (lphase == 1) then
+               jnv = 2
+               !Set correct below cloud scaveing coefficients
+               !Hard-coded values per mode in NorESM
+               if(is_process_mode(mm,.FALSE.))then
+                  scavcoefnv(:,:,jnv) = belowCloudScavengingCoefficientProcessModes(processModeMap(mm))
+               else
+                  scavcoefnv(:,:,jnv) = belowCloudScavengingCoefficient(m)
+               end if
+            else
+               jnv = 0  !==> below cloud scavenging coefficients are zero (see above)
+            endif
 
-! Increase scavenging efficiency for large soluble particles.
-              if ((lphase==1).and.((mm==l_ss_a2).or.(mm==l_ss_a3).or.(mm==l_so4_a2))) then
-                 sol_factic=1.0_r8 
-                 f_act_conv=1.0_r8 
-              end if     
+            ! Increase scavenging efficiency for large soluble particles.
+            if ((lphase==1).and.((mm==l_ss_a2).or.(mm==l_ss_a3).or.(mm==l_so4_a2))) then
+               sol_factic=1.0_r8 
+               f_act_conv=1.0_r8 
+            end if     
 
-             if ((lphase == 1) .and. (lspec <= getNumberOfTracersInMode(m))) then
-                ptend%lq(mm) = .TRUE.
-                dqdt_tmp(:,:) = 0.0_r8
-                ! q_tmp reflects changes from modal_aero_calcsize and is the "most current" q
-                q_tmp(1:ncol,:) = q(1:ncol,:,mm) + ptend%q(1:ncol,:,mm)*dt
-                if(convproc_do_aer) then
-                   !Feed in the saved cloudborne mixing ratios from phase 2
-                   qqcw_in(:,:) = qqcw_sav(:,:,mm)
-                   !Not implemented for oslo aerosols
-                else
-                   fldcw => qqcw_get_field(pbuf, mm)
-                   if(.not. associated(fldcw))then
-                      qqcw_in(:,:) = zeroAerosolConcentration(:,:)
-                   else
-                      qqcw_in(:,:) = fldcw(:,:)
-                   end if
-                endif
+            if ((lphase == 1) .and. (lspec <= getNumberOfTracersInMode(m))) then
+               ptend%lq(mm) = .TRUE.
+               dqdt_tmp(:,:) = 0.0_r8
+               ! q_tmp reflects changes from modal_aero_calcsize and is the "most current" q
+               q_tmp(1:ncol,:) = q(1:ncol,:,mm) + ptend%q(1:ncol,:,mm)*dt
+               if(convproc_do_aer) then
+                  !Feed in the saved cloudborne mixing ratios from phase 2
+                  qqcw_in(:,:) = qqcw_sav(:,:,mm)
+                  !Not implemented for oslo aerosols
+               else
+                  fldcw => qqcw_get_field(pbuf, mm)
+                  if(.not. associated(fldcw))then
+                     qqcw_in(:,:) = zeroAerosolConcentration(:,:)
+                  else
+                     qqcw_in(:,:) = fldcw(:,:)
+                  end if
+               endif
 
-                call wetdepa_v2( pmid, q(:,:,1), pdel, &
-                     dep_inputs%cldt, dep_inputs%cldcu, dep_inputs%cmfdqr, &
-                     dep_inputs%evapc, dep_inputs%conicw, dep_inputs%prain, dep_inputs%qme, &
-                     dep_inputs%evapr, dep_inputs%totcond, q_tmp, dt, &
-                     dqdt_tmp, iscavt, dep_inputs%cldvcu, dep_inputs%cldvst, &
-                     dlf, fracis(:,:,mm), sol_factb, ncol, &
-                     scavcoefnv(:,:,jnv), &
-                     is_strat_cloudborne=.false., &
-                     qqcw=qqcw_in(:,:),  &
-                     f_act_conv=f_act_conv, &
-                     icscavt=icscavt, isscavt=isscavt, bcscavt=bcscavt, bsscavt=bsscavt, &
-                     convproc_do_aer=.false., rcscavt=rcscavt, rsscavt=rsscavt,  &
-                     sol_facti_in=sol_facti, sol_factic_in=sol_factic )
+               call wetdepa_v2( pmid, q(:,:,1), pdel, &
+                  dep_inputs%cldt, dep_inputs%cldcu, dep_inputs%cmfdqr, &
+                  dep_inputs%evapc, dep_inputs%conicw, dep_inputs%prain, dep_inputs%qme, &
+                  dep_inputs%evapr, dep_inputs%totcond, q_tmp, dt, &
+                  dqdt_tmp, iscavt, dep_inputs%cldvcu, dep_inputs%cldvst, &
+                  dlf, fracis(:,:,mm), sol_factb, ncol, &
+                  scavcoefnv(:,:,jnv), &
+                  is_strat_cloudborne=.false., &
+                  qqcw=qqcw_in(:,:),  &
+                  f_act_conv=f_act_conv, &
+                  icscavt=icscavt, isscavt=isscavt, bcscavt=bcscavt, bsscavt=bsscavt, &
+                  convproc_do_aer=.false., rcscavt=rcscavt, rsscavt=rsscavt,  &
+                  sol_facti_in=sol_facti, sol_factic_in=sol_factic )
 
-                ptend%q(1:ncol,:,mm) = ptend%q(1:ncol,:,mm) + dqdt_tmp(1:ncol,:)
+               ptend%q(1:ncol,:,mm) = ptend%q(1:ncol,:,mm) + dqdt_tmp(1:ncol,:)
 
-                call outfld(trim(cnst_name(mm))//'WET', dqdt_tmp(:ncol,:), ncol, lchnk)
-                call outfld(trim(cnst_name(mm))//'SIC', icscavt(:ncol,:),  ncol, lchnk)
-                call outfld(trim(cnst_name(mm))//'SIS', isscavt(:ncol,:),  ncol, lchnk)
-                call outfld(trim(cnst_name(mm))//'SBC', bcscavt(:ncol,:),  ncol, lchnk)
-                call outfld(trim(cnst_name(mm))//'SBS', bsscavt(:ncol,:),  ncol, lchnk)
+               call outfld(trim(cnst_name(mm))//'WET', dqdt_tmp(:ncol,:), ncol, lchnk)
+               call outfld(trim(cnst_name(mm))//'SIC', icscavt(:ncol,:),  ncol, lchnk)
+               call outfld(trim(cnst_name(mm))//'SIS', isscavt(:ncol,:),  ncol, lchnk)
+               call outfld(trim(cnst_name(mm))//'SBC', bcscavt(:ncol,:),  ncol, lchnk)
+               call outfld(trim(cnst_name(mm))//'SBS', bsscavt(:ncol,:),  ncol, lchnk)
 
-                sflx(:)=0._r8
-                do k=1,pver
-                   do i=1,ncol
-                      sflx(i)=sflx(i)+dqdt_tmp(i,k)*pdel(i,k)/gravit
-                   enddo
-                enddo
-                if (.not. convproc_do_aer) call outfld( trim(cnst_name(mm))//'SFWET', sflx(:ncol), ncol, lchnk)
-                aerdepwetis(:ncol,mm) = sflx(:ncol)
+               sflx(:)=0._r8
+               do k=1,pver
+                  do i=1,ncol
+                     sflx(i)=sflx(i)+dqdt_tmp(i,k)*pdel(i,k)/gravit
+                  enddo
+               enddo
+               
+               if (.not. convproc_do_aer) call outfld( trim(cnst_name(mm))//'SFWET', sflx(:ncol), ncol, lchnk)
+               aerdepwetis(:ncol,mm) = sflx(:ncol)
 
-                sflx(:)=0._r8
-                do k=1,pver
-                   do i=1,ncol
-                      sflx(i)=sflx(i)+icscavt(i,k)*pdel(i,k)/gravit
-                   enddo
-                enddo
-                if (.not. convproc_do_aer) call outfld( trim(cnst_name(mm))//'SFSIC', sflx(:ncol), ncol, lchnk)
-                if (convproc_do_aer) sflxic = sflx
+               sflx(:)=0._r8
+               do k=1,pver
+                  do i=1,ncol
+                     sflx(i)=sflx(i)+icscavt(i,k)*pdel(i,k)/gravit
+                  enddo
+               enddo
+               if (.not. convproc_do_aer) call outfld( trim(cnst_name(mm))//'SFSIC', sflx(:ncol), ncol, lchnk)
+               if (convproc_do_aer) sflxic = sflx
 
-                sflx(:)=0._r8
-                do k=1,pver
-                   do i=1,ncol
-                      sflx(i)=sflx(i)+isscavt(i,k)*pdel(i,k)/gravit
-                   enddo
-                enddo
-                call outfld( trim(cnst_name(mm))//'SFSIS', sflx(:ncol), ncol, lchnk)
+               sflx(:)=0._r8
+               do k=1,pver
+                  do i=1,ncol
+                     sflx(i)=sflx(i)+isscavt(i,k)*pdel(i,k)/gravit
+                  enddo
+               enddo
+               call outfld( trim(cnst_name(mm))//'SFSIS', sflx(:ncol), ncol, lchnk)
 
-                sflx(:)=0._r8
-                do k=1,pver
-                   do i=1,ncol
-                      sflx(i)=sflx(i)+bcscavt(i,k)*pdel(i,k)/gravit
-                   enddo
-                enddo
-                call outfld( trim(cnst_name(mm))//'SFSBC', sflx(:ncol), ncol, lchnk)
-                if (convproc_do_aer)sflxbc = sflx
+               sflx(:)=0._r8
+               do k=1,pver
+                  do i=1,ncol
+                     sflx(i)=sflx(i)+bcscavt(i,k)*pdel(i,k)/gravit
+                  enddo
+               enddo
+               call outfld( trim(cnst_name(mm))//'SFSBC', sflx(:ncol), ncol, lchnk)
+               if (convproc_do_aer)sflxbc = sflx
 
-                sflx(:)=0._r8
-                do k=1,pver
-                   do i=1,ncol
-                      sflx(i)=sflx(i)+bsscavt(i,k)*pdel(i,k)/gravit
-                   enddo
-                enddo
-                call outfld( trim(cnst_name(mm))//'SFSBS', sflx(:ncol), ncol, lchnk)
+               sflx(:)=0._r8
+               do k=1,pver
+                  do i=1,ncol
+                     sflx(i)=sflx(i)+bsscavt(i,k)*pdel(i,k)/gravit
+                  enddo
+               enddo
+               call outfld( trim(cnst_name(mm))//'SFSBS', sflx(:ncol), ncol, lchnk)
 
-             else   ! lphase == 2
+            else   ! lphase == 2
 
-                dqdt_tmp(:,:) = 0.0_r8
-                qqcw_tmp(:,:) = 0.0_r8    ! rce 2010/05/01
+               dqdt_tmp(:,:) = 0.0_r8
+               qqcw_tmp(:,:) = 0.0_r8    ! rce 2010/05/01
 
-                if (convproc_do_aer) then
-                   fldcw => qqcw_get_field(pbuf,mm)
-                   if (.not. associated(fldcw)) then
-                      call endrun('attempt to access undefined qqcw_sav for fld_cw')
-                   end if
-                   qqcw_sav(1:ncol,:,mm) = fldcw(1:ncol,:)
-                   !This option yet not implemented for OSLO_AERO
-                else
-                   fldcw => qqcw_get_field(pbuf, mm)
-                   if(.not. associated(fldcw))then
-                      cycle
-                   end if
-                endif
+               if (convproc_do_aer) then
+                  fldcw => qqcw_get_field(pbuf,mm)
+                  if (.not. associated(fldcw)) then
+                     call endrun('attempt to access undefined qqcw_sav for fld_cw')
+                  end if
+                  qqcw_sav(1:ncol,:,mm) = fldcw(1:ncol,:)
+                  !This option yet not implemented for OSLO_AERO
+               else
+                  fldcw => qqcw_get_field(pbuf, mm)
+                  if(.not. associated(fldcw))then
+                     cycle
+                  end if
+               endif
 
-                call wetdepa_v2(pmid, q(:,:,1), pdel, &
-                     dep_inputs%cldt, dep_inputs%cldcu, dep_inputs%cmfdqr, &
-                     dep_inputs%evapc, dep_inputs%conicw, dep_inputs%prain, dep_inputs%qme, &
-                     dep_inputs%evapr, dep_inputs%totcond, fldcw, dt, &
-                     dqdt_tmp, iscavt, dep_inputs%cldvcu, dep_inputs%cldvst, &
-                     dlf, fracis_cw, sol_factb, ncol, &
-                     scavcoefnv(:,:,jnv), &
-                     is_strat_cloudborne=.true.,  &
-                     icscavt=icscavt, isscavt=isscavt, bcscavt=bcscavt, bsscavt=bsscavt, &
-                     convproc_do_aer=.false., rcscavt=rcscavt, rsscavt=rsscavt,  &
-                     sol_facti_in=sol_facti, sol_factic_in=sol_factic )
+               call wetdepa_v2(pmid, q(:,:,1), pdel, &
+                  dep_inputs%cldt, dep_inputs%cldcu, dep_inputs%cmfdqr, &
+                  dep_inputs%evapc, dep_inputs%conicw, dep_inputs%prain, dep_inputs%qme, &
+                  dep_inputs%evapr, dep_inputs%totcond, fldcw, dt, &
+                  dqdt_tmp, iscavt, dep_inputs%cldvcu, dep_inputs%cldvst, &
+                  dlf, fracis_cw, sol_factb, ncol, &
+                  scavcoefnv(:,:,jnv), &
+                  is_strat_cloudborne=.true.,  &
+                  icscavt=icscavt, isscavt=isscavt, bcscavt=bcscavt, bsscavt=bsscavt, &
+                  convproc_do_aer=.false., rcscavt=rcscavt, rsscavt=rsscavt,  &
+                  sol_facti_in=sol_facti, sol_factic_in=sol_factic )
 
-                fldcw(1:ncol,:) = fldcw(1:ncol,:) + dqdt_tmp(1:ncol,:) * dt
+               fldcw(1:ncol,:) = fldcw(1:ncol,:) + dqdt_tmp(1:ncol,:) * dt
 
-                sflx(:)=0._r8
-                do k=1,pver
-                   do i=1,ncol
-                      sflx(i)=sflx(i)+dqdt_tmp(i,k)*pdel(i,k)/gravit
-                   enddo
-                enddo
-                call outfld( trim(getCloudTracerName(mm))//'SFWET', sflx(:ncol), ncol, lchnk)
-                aerdepwetcw(:ncol,mm) = sflx(:ncol)
+               sflx(:)=0._r8
+               do k=1,pver
+                  do i=1,ncol
+                     sflx(i)=sflx(i)+dqdt_tmp(i,k)*pdel(i,k)/gravit
+                  enddo
+               enddo
+               
 
-                sflx(:)=0._r8
-                do k=1,pver
-                   do i=1,ncol
-                      sflx(i)=sflx(i)+icscavt(i,k)*pdel(i,k)/gravit
-                   enddo
-                enddo
-                call outfld( trim(getCloudTracerName(mm))//'SFSIC', sflx(:ncol), ncol, lchnk)
-                sflx(:)=0._r8
-                do k=1,pver
-                   do i=1,ncol
-                      sflx(i)=sflx(i)+isscavt(i,k)*pdel(i,k)/gravit
-                   enddo
-                enddo
-                call outfld( trim(getCloudTracerName(mm))//'SFSIS', sflx(:ncol), ncol, lchnk)
-                sflx(:)=0._r8
-                do k=1,pver
-                   do i=1,ncol
-                      sflx(i)=sflx(i)+bcscavt(i,k)*pdel(i,k)/gravit
-                   enddo
-                enddo
-                call outfld( trim(getCloudTracerName(mm))//'SFSBC', sflx(:ncol), ncol, lchnk)
-                sflx(:)=0._r8
-                do k=1,pver
-                   do i=1,ncol
-                      sflx(i)=sflx(i)+bsscavt(i,k)*pdel(i,k)/gravit
-                   enddo
-                enddo
-                call outfld( trim(getCloudTracerName(mm))//'SFSBS', sflx(:ncol), ncol, lchnk)
+               call outfld( trim(getCloudTracerName(mm))//'SFWET', sflx(:ncol), ncol, lchnk)
+               aerdepwetcw(:ncol,mm) = sflx(:ncol)
 
-             endif
+               sflx(:)=0._r8
+               do k=1,pver
+                  do i=1,ncol
+                     sflx(i)=sflx(i)+icscavt(i,k)*pdel(i,k)/gravit
+                  enddo
+               enddo
+               call outfld( trim(getCloudTracerName(mm))//'SFSIC', sflx(:ncol), ncol, lchnk)
+               sflx(:)=0._r8
+               do k=1,pver
+                  do i=1,ncol
+                     sflx(i)=sflx(i)+isscavt(i,k)*pdel(i,k)/gravit
+                  enddo
+               enddo
+               call outfld( trim(getCloudTracerName(mm))//'SFSIS', sflx(:ncol), ncol, lchnk)
+               sflx(:)=0._r8
+               do k=1,pver
+                  do i=1,ncol
+                     sflx(i)=sflx(i)+bcscavt(i,k)*pdel(i,k)/gravit
+                  enddo
+               enddo
+               call outfld( trim(getCloudTracerName(mm))//'SFSBC', sflx(:ncol), ncol, lchnk)
+               sflx(:)=0._r8
+               do k=1,pver
+                  do i=1,ncol
+                     sflx(i)=sflx(i)+bsscavt(i,k)*pdel(i,k)/gravit
+                  enddo
+               enddo
+               call outfld( trim(getCloudTracerName(mm))//'SFSBS', sflx(:ncol), ncol, lchnk)
 
-          enddo   ! lspec = 0, nspec_amode(m)+1
-       enddo   ! lphase = 1, 2
-    enddo   ! m = 1, ntot_amode
+            endif
+            
+            ! accumulate the deposition flux for the aerosol type
+            sflx(:ncol) = 0._r8
+            if ( lphase == 1 ) then
+               sflx(:ncol) = aerdepwetis(:ncol,mm)
+            else ! lphase == 2
+               sflx(:ncol) = aerdepwetcw(:ncol,mm)
+            endif
+            
+            ! accumulate the deposition flux for the aerosol type (no weighting FOR DEBBUGGING)
+            sflx_SFWET_arosol_type_nw(:, aerosolType(mm)) = sflx_SFWET_arosol_type_nw(:, aerosolType(mm)) + sflx(:ncol)
+
+            ! if it is not sulfate we accumulate without weighting
+            if ( aerosolType(mm) /=  AEROSOL_TYPE_SULFATE ) then
+               sflx_SFWET_arosol_type(:, aerosolType(mm)) = sflx_SFWET_arosol_type(:, aerosolType(mm)) + sflx(:ncol)
+            else ! if it is sulfate we accumulate with weighting, based on fraction of sulfur in the aerosol type
+               if ( mm == l_so4_a2 ) then
+                  sflx_SFWET_arosol_type(:, aerosolType(mm)) = sflx_SFWET_arosol_type(:, aerosolType(mm)) + ( sflx(:ncol) / 3.59 )
+               else
+                  sflx_SFWET_arosol_type(:, aerosolType(mm)) = sflx_SFWET_arosol_type(:, aerosolType(mm)) + ( sflx(:ncol) / 3.06 )
+               end if
+            endif
+            
+         enddo   ! lspec = 0, nspec_amode(m)+1
+      enddo   ! lphase = 1, 2
+   enddo   ! m = 1, ntot_amode
+
+   do n=1,N_AEROSOL_TYPES
+      ! add the DDF rate of the compound aerosols to output
+      call outfld(trim(aerosol_type_name(n))//'SFWET_nw', sflx_SFWET_arosol_type_nw(:ncol,n), ncol, lchnk)
+      call outfld(trim(aerosol_type_name(n))//'SFWET', sflx_SFWET_arosol_type(:ncol,n), ncol, lchnk)
+   end do
 
     ! if the user has specified prescribed aerosol dep fluxes then
     ! do not set cam_out dep fluxes according to the prognostic aerosols
