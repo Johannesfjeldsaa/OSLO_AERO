@@ -850,18 +850,18 @@ contains
             endif
             
             call addfld (sflxnam(n),horiz_only,    'A',  unit_basename//'/m2/s',trim(solsym(m))//' surface flux')
-          if ( history_aerosol .or. history_chemistry ) then
+            if ( history_aerosol .or. history_chemistry ) then
                call add_default( sflxnam(n), 1, ' ' )
             endif
 
             !OSLO_AERO begin
             if ( n == l_dms .or. n == l_isoprene .or. n == l_monoterp) then
 
-               call addfld('emis_'//trim(solsym(m)), horiz_only, 'A', 'kg/m2/s', &
-                     trim(solsym(m))//' emissions')
+               call addfld('emis_'//trim(sflxnam(n)(3:)), horiz_only, 'A', 'kg/m2/s', &
+                     trim(sflxnam(n)(3:))//' emissions')
                if ( n == l_dms ) then
-                  call addfld('emis_'//trim(solsym(m))//'_S', horiz_only, 'A', 'kg*S/m2/s', &
-                     trim(solsym(m))//' emissions, sulfur mass only')
+                  call addfld('emis_'//trim(sflxnam(n)(3:))//'_S', horiz_only, 'A', 'kg*S/m2/s', &
+                     trim(sflxnam(n)(3:))//' emissions, sulfur mass only')
                endif
                
                if ( history_aerosol .or. history_aerosol_base ) then 
@@ -887,6 +887,19 @@ contains
             endif
          endif
       end do
+
+      ! OSLO_AERO begin
+      ! emissions of SALT and DUST can be calculated from the SF**** variables, therefore we need to add them to the history
+      call addfld ('emis_SALT', horiz_only, 'A',  'kg/m2/s',   &
+         'SALT surface flux')
+      call addfld ('emis_DUST', horiz_only, 'A',  'kg/m2/s',   &
+         'DUST surface flux')
+      if ( history_aerosol_base ) then
+         call add_default( 'emis_SALT', 1, ' ' )
+         call add_default( 'emis_DUST', 1, ' ' )
+      endif
+      ! OSLO_AERO end
+
 
       ! Add chemical tendency of water vapor to water budget output
       if ( history_budget ) then
@@ -1010,7 +1023,8 @@ contains
       use aero_model,       only: aero_model_emissions
       ! OSLO_AERO begin
       use oslo_aero_share,  only: l_dms, l_isoprene, l_monoterp
-      use oslo_aero_share,  only: sulfurMassFraction
+      use oslo_aero_share,  only: aerosolType, sulfurMassFraction
+      use oslo_aero_share,  only: N_AEROSOL_TYPES, AEROSOL_TYPE_SALT, AEROSOL_TYPE_DUST
       ! OSLO_AERO end
 
       ! Arguments:
@@ -1025,6 +1039,12 @@ contains
 
       real(r8) :: sflx(pcols,gas_pcnst)
       real(r8) :: megflx(pcols)
+      ! OSLO_AERO begin
+      ! initialize an array to hold the aerosol emissions for each aerosol type
+      real(r8) :: aero_emis(pcols, N_AEROSOL_TYPES)
+      
+      aero_emis(:,:) = 0.0_r8
+      ! OSLO_AERO end
 
       lchnk = state%lchnk
       ncol = state%ncol
@@ -1069,17 +1089,28 @@ contains
             call outfld( sflxnam(m), cam_in%cflx(:ncol,m), ncol,lchnk )
 
             !OSLO_AERO begin
+            ! output emissions for DMS, isoprene, and monoterpenes
             if ( m == l_dms .or. m == l_isoprene .or. m == l_monoterp) then
                call outfld('emis_'//trim(sflxnam(m)(3:)), cam_in%cflx(:ncol,m), ncol,lchnk )
                if ( m == l_dms ) then
                   call outfld('emis_'//trim(sflxnam(m)(3:)), ( cam_in%cflx(:ncol,m) * sulfurMassFraction(m) ), ncol,lchnk )
                endif
             endif
+
+            ! add salt and dust emissions to the compunded aerosol emissions
+            if ( aerosolType(m) == AEROSOL_TYPE_SALT .or. aerosolType(m) == AEROSOL_TYPE_DUST ) then
+               aero_emis(:,aerosolType(m)) = aero_emis(:,aerosolType(m)) + cam_in%cflx(:,m)
+            endif
             !OSLO_AERO end
             
          endif
       enddo
 
+      ! OSLO_AERO begin
+      ! output the compounded aerosol emissions
+      call outfld('emis_SALT', aero_emis(:,AEROSOL_TYPE_SALT), ncol, lchnk)
+      call outfld('emis_DUST', aero_emis(:,AEROSOL_TYPE_DUST), ncol, lchnk)
+      ! OSLO_AERO end
       ! fire surface emissions if not elevated forcing
       call fire_emissions_srf( lchnk, ncol, cam_in%fireflx, cam_in%cflx )
 
