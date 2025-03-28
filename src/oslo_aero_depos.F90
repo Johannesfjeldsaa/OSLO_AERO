@@ -582,10 +582,7 @@ contains
             ! accumulate the deposition flux for the aerosol type
             ! All will have a version without weighted sum, that is ...DDF
             ! sulfate will have a version with weighted sum, that is ...SDDF
-            ! BC_AX is not included in BCDDF
-            if ( mm /= l_bc_ax ) then 
-               sflx_DDF_arosol_type(:, aerosolType(mm)) = sflx_DDF_arosol_type(:, aerosolType(mm)) + sflx(:ncol)
-            endif 
+            sflx_DDF_arosol_type(:, aerosolType(mm)) = sflx_DDF_arosol_type(:, aerosolType(mm)) + sflx(:ncol)
             if ( aerosolType(mm) ==  AEROSOL_TYPE_SULFATE ) then
                sflx_DDF_SULFATE_S(:) = sflx_DDF_SULFATE_S(:) + ( sflx(:ncol) * sulfurMassFraction(mm) )
             endif
@@ -972,14 +969,11 @@ contains
             ! opposed to sflx_SFWET_arosol_type, this is because the wet deposition
             ! of sulfate includes WD_A_H2SO4 and therefor is calculated in 
             ! another module
-            ! NOTE: BC_AX is not included in BCSFWET
-            if ( mm /= l_bc_ax ) then 
-               if ( aerosolType(mm) == AEROSOL_TYPE_SULFATE ) then
-                  sflx_SFWET_SULFATE(:) = sflx_SFWET_SULFATE(:) + sflx(:ncol)
-                  sflx_SFWET_SULFATE_S(:) = sflx_SFWET_SULFATE_S(:) + ( sflx(:ncol) * sulfurMassFraction(mm) )
-               else
-                  sflx_SFWET_arosol_type(:, aerosolType(mm)) = sflx_SFWET_arosol_type(:, aerosolType(mm)) + sflx(:ncol)
-               endif
+            if ( aerosolType(mm) == AEROSOL_TYPE_SULFATE ) then
+               sflx_SFWET_SULFATE(:) = sflx_SFWET_SULFATE(:) + sflx(:ncol)
+               sflx_SFWET_SULFATE_S(:) = sflx_SFWET_SULFATE_S(:) + ( sflx(:ncol) * sulfurMassFraction(mm) )
+            else
+               sflx_SFWET_arosol_type(:, aerosolType(mm)) = sflx_SFWET_arosol_type(:, aerosolType(mm)) + sflx(:ncol)
             endif
             
          enddo   ! lspec = 0, nspec_amode(m)+1
