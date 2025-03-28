@@ -1139,4 +1139,24 @@ contains
 
    end subroutine init_interp_constants
 
+   !===================================================
+   subroutine summation_fields_writeout(lchnk)
+      ! -----------------------------------------------------------------------
+      !
+      !   SUBROUTINE: summation_fields_writeout
+      !
+      !   DESCRIPTION: 
+      !
+      !   ARGUMENTS:
+      !
+      ! -----------------------------------------------------------------------
+
+      ! --------------------------------------
+      ! Arguments summation_fields_writeout
+      ! --------------------------------------
+      integer,   intent(in)        :: lchnk 
+
+      
+   end subroutine summation_fields_writeout
+
 end module oslo_aero_share
