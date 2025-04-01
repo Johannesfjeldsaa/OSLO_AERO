@@ -79,7 +79,7 @@ contains
     character(len=16) :: unitstr
     !-----------------------------------------------------------------------
     logical :: history_scwaccm_forcing
-    
+
     call phys_getopts( history_scwaccm_forcing_out = history_scwaccm_forcing )
 
     call phys_getopts( convproc_do_aer_out = convproc_do_aer, history_cesm_forcing_out=history_cesm_forcing )
@@ -238,8 +238,8 @@ contains
        call addfld ('OH_aft    ',  (/ 'lev' /), 'A','molecules cm-3', 'OH invariants after adding diurnal variations'            )
        call addfld ('HO2_aft   ',  (/ 'lev' /), 'A','molecules cm-3', 'HO2 invariants after adding diurnal variations'           )
        call addfld ('NO3_aft   ',  (/ 'lev' /), 'A','molecules cm-3', 'NO3 invariants after adding diurnal variations'           )
-       
-       if ( history_aerosol_forcing ) then 
+
+       if ( history_aerosol_forcing ) then
          call add_default ('OH_bef       ', 1, ' ')
          call add_default ('HO2_bef      ', 1, ' ')
          call add_default ('NO3_bef      ', 1, ' ')
@@ -679,7 +679,7 @@ contains
     !-----------------------------------------------------------------------
     !        ... Set the "day/night cycle for prescribed oxidants"
     !-----------------------------------------------------------------------
-    if (.not.modal_strat_sulfate) then 
+    if (.not.modal_strat_sulfate) then
        call outfld('OH_bef',    invariants(:,:,id_oh),  ncol, lchnk)
        call outfld('HO2_bef',   invariants(:,:,id_ho2), ncol, lchnk)
        call outfld('NO3_bef',   invariants(:,:,id_no3), ncol, lchnk)
@@ -960,7 +960,7 @@ contains
                     cmfdqr, prain, nevapr, delt, invariants(:,:,indexm), &
                     vmr, ncol, lchnk )
        if (.not. convproc_do_aer) then
-          call het_diags( het_rates(:ncol,:,:), mmr(:ncol,:,:), pdel(:ncol,:), lchnk, ncol )
+          call het_diags( het_rates(:ncol,:,:), mmr(:ncol,:,:), pdel(:ncol,:), lchnk, ncol, pbuf )
        endif
     else
        het_rates = 0._r8
@@ -1024,7 +1024,7 @@ contains
        call vmr2mmr( vmr(:ncol,:,:), mmr_new(:ncol,:,:), mbar(:ncol,:), ncol )
        ! mmr_new = average of mmr values before and after imp_sol
        mmr_new(:ncol,:,:) = 0.5_r8*( mmr(:ncol,:,:) + mmr_new(:ncol,:,:) )
-       call het_diags( het_rates(:ncol,:,:), mmr_new(:ncol,:,:), pdel(:ncol,:), lchnk, ncol )
+       call het_diags( het_rates(:ncol,:,:), mmr_new(:ncol,:,:), pdel(:ncol,:), lchnk, ncol, pbuf )
     endif
 
     ! save h2so4 change by gas phase chem (for later new particle nucleation)

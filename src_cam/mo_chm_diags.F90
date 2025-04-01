@@ -56,6 +56,8 @@ module mo_chm_diags
   real(r8), parameter :: N_molwgt = 14.00674_r8
   real(r8), parameter :: S_molwgt = 32.066_r8
 
+  integer :: idx_wd_a_h2so4 = -1
+
 contains
 
   subroutine chm_diags_inti
@@ -73,7 +75,7 @@ contains
     use oslo_aero_share, only: aerosol_type_name, N_AEROSOL_TYPES, AEROSOL_TYPE_SULFATE
     use oslo_aero_share, only: l_so2, l_dms
     use phys_control,    only: history_aerosol_base,        &
-                               history_aerosol_decomposed,  &   
+                               history_aerosol_decomposed,  &
                                history_gas
 
     ! OSLO_AERO end
@@ -121,7 +123,7 @@ contains
                        history_chemspecies_srf_out = history_chemspecies_srf, &
                        history_cesm_forcing_out = history_cesm_forcing, &
                        history_scwaccm_forcing_out = history_scwaccm_forcing, &
-                       history_dust_out = history_dust ) 
+                       history_dust_out = history_dust )
 
 
     id_bry     = get_spc_ndx( 'BRY' )
@@ -362,10 +364,10 @@ contains
          flag_xyfill=.True. )
 !
     do m = 1,gas_pcnst
-       
-       ! get the species name 
+
+       ! get the species name
        spc_name = trim(solsym(m))
-       
+
        ! ant then get the index of the constituent, is -1 if spc_name is not recongniced
        call cnst_get_ind(spc_name, n, abort=.false. )
        if ( n > 0 ) then
@@ -472,30 +474,30 @@ contains
        endif
 
       ! OSLO_AERO begin
-      ! Add the 3D consentrations 
-      if ( n > 0 ) then 
+      ! Add the 3D consentrations
+      if ( n > 0 ) then
          ! if history_aerosol_decomposed we add the aerosol species
          if ( (any( aer_species == m ) .or. isAerosol(n)) ) then
             if ( history_aerosol_decomposed ) then
                call add_default( spc_name, 1, ' ' )
             endif
          ! if it is not an aerosol species it is a gas species and we then require the history_gas flag
-         else 
-            if ( history_gas ) then 
+         else
+            if ( history_gas ) then
                call add_default( spc_name, 1, ' ' )
             endif
          endif
       elseif ( trim(spc_name) == 'H2O' ) then
-         if ( history_gas ) then 
+         if ( history_gas ) then
             call add_default( spc_name, 1, ' ' )
          endif
-      endif 
+      endif
 
       if(n > 0) then
          ! Add cloud tracers to default output
          cloudTracerIndex_direct = getCloudTracerIndexDirect(n)
          if ( cloudTracerIndex_direct > 0 ) then
-            ! first the 3d fields, 
+            ! first the 3d fields,
             cloudTracerName = getCloudTracerName(n)
             call addfld( trim(cloudTracerName), (/'lev'/), 'A','kg/kg', &
                trim(cloudTracerName)//' in cloud water')
@@ -506,17 +508,17 @@ contains
             ! and then then add column burden of cloud tracers
             call addfld('cb_'//trim(cloudTracerName),horiz_only, 'A', 'kg/m2', &
                'cb_'//trim(cloudTracerName)//' column in cloud water')
-            if ( history_aerosol_decomposed ) then 
+            if ( history_aerosol_decomposed ) then
                call add_default('cb_'//trim(cloudTracerName),1,' ')
             endif
          endif
-          
-         ! ... Then add the column burden in clean air 
+
+         ! ... Then add the column burden in clean air
          call addfld('cb_'//trim(spc_name),horiz_only, 'A', 'kg/m2', &
             'cb_'//trim(spc_name)//' in column')
 
          ! ... and if it is so2 or dms we add the column burden of the sulfur
-         if ( n == l_so2 .or. n == l_dms ) then 
+         if ( n == l_so2 .or. n == l_dms ) then
             call addfld(trim('cb_'//trim(spc_name)//'_S'), horiz_only, 'A', 'kg*S/m2', &
                'cb_'//trim(spc_name)//' column, sulfur mass only')
          endif
@@ -527,15 +529,15 @@ contains
                call add_default('cb_'//trim(spc_name),1,' ' )
             endif
          ! else, if it is a gasphase the cb is included in the base so we require history_aerosol_base flag
-         else 
-            if ( history_aerosol_base ) then 
+         else
+            if ( history_aerosol_base ) then
                call add_default('cb_'//trim(spc_name), 1, ' ')
                ! if it is so2 or dms we add the column burden of the sulfur
-               if ( n == l_so2 .or. n == l_dms ) then 
+               if ( n == l_so2 .or. n == l_dms ) then
                   call add_default(trim('cb_'//trim(spc_name)//'_S'), 1, ' ')
                endif
             endif
-         endif 
+         endif
 
          if (history_aerosol) then
             if (cloudTracerIndex_direct > 0) then
@@ -560,20 +562,20 @@ contains
    ! OSLO_AERO begin
    ! iterate over the compounded aerosol types
    do n=1,N_AEROSOL_TYPES
-      
+
       ! add the column burden of the compound aerosols to output
       call addfld('cb_'//trim(aerosol_type_name(n)),horiz_only, 'A', 'kg/m2',&
          'cb_'//trim(aerosol_type_name(n))//' column of aerosol type')
-      if ( n == AEROSOL_TYPE_SULFATE ) then 
+      if ( n == AEROSOL_TYPE_SULFATE ) then
          call addfld('cb_'//trim(aerosol_type_name(n))//'_S',horiz_only, 'A', 'kg*S/m2',&
          'cb_'//trim(aerosol_type_name(n))//' column of aerosol, sulfur mass only')
       endif
       ! we require history_aerosol_base flag
-      if ( history_aerosol_base ) then 
+      if ( history_aerosol_base ) then
          call add_default('cb_'//trim(aerosol_type_name(n)), 1, ' ')
 
          ! if the aerosol type is sulfur we make a version of the column burden that is only the sulfur
-         if ( n == AEROSOL_TYPE_SULFATE ) then 
+         if ( n == AEROSOL_TYPE_SULFATE ) then
             call add_default('cb_'//trim(aerosol_type_name(n))//'_S', 1, ' ')
          endif
       endif
@@ -846,7 +848,7 @@ contains
          if ( aerosolType(n) > 0 ) then
             ! column burden in terms of aerosol type mass
             cb_aerosol_type(:ncol,aerosolType(n)) = cb_aerosol_type(:ncol,aerosolType(n)) + cb(:ncol)
-            
+
             ! column burden in terms of sulfur mass for sulfate aerosol
             if (aerosolType(n) == AEROSOL_TYPE_SULFATE) then
                cb_SULFUR_S(:ncol) = cb_SULFUR_S(:ncol) + ( cb(:ncol) * sulfurMassFraction(n) )
@@ -857,7 +859,7 @@ contains
          mass_tmp(:ncol,:) = mmr(:ncol,:,m) * pdel(:ncol,:) * rgrav
          cb(:ncol) = sum(mass_tmp(:ncol,:),2)
          call outfld(trim('cb_'//trim(spc_name)), cb, pcols, lchnk)
-         if ( n == l_so2 .or. n == l_dms ) then 
+         if ( n == l_so2 .or. n == l_dms ) then
             call outfld(trim('cb_'//trim(spc_name)//'_S'), ( cb(:ncol) * sulfurMassFraction(n) ), pcols, lchnk)
          endif
 
@@ -1078,11 +1080,13 @@ contains
 
   end subroutine chm_diags
 
-  subroutine het_diags( het_rates, mmr, pdel, lchnk, ncol )
+  subroutine het_diags( het_rates, mmr, pdel, lchnk, ncol, pbuf )
 
-    use cam_history,  only : outfld
+    use cam_history,    only: outfld
     ! OSLO_AERO begin
-    use phys_grid,    only : get_wght_all_p, get_area_all_p
+    use constituents,   only: cnst_get_ind
+    use phys_grid,      only: get_wght_all_p, get_area_all_p
+    use physics_buffer, only: physics_buffer_desc, pbuf_get_field
     ! OSLO_AERO end
 
     integer,  intent(in)  :: lchnk
@@ -1091,12 +1095,17 @@ contains
     real(r8), intent(in)  :: mmr(ncol,pver,gas_pcnst)
     real(r8), intent(in)  :: pdel(ncol,pver)
 
+    type(physics_buffer_desc), pointer :: pbuf(:)
+
     real(r8), dimension(ncol) :: noy_wk, sox_wk, nhx_wk, wrk_wd
     ! OSLO_AERO begin
-    real(r8), dimension(ncol) :: area
+    integer           :: id_h2so4
+    real(r8)          :: area(ncol)
+    real(r8)          :: wrk_m2(ncol)
+    real(r8), pointer :: wd_a_h2so4(:)
     ! OSLO_AERO end
-    integer :: m, k
-    real(r8) :: wght(ncol)
+    integer           :: m, k
+    real(r8)          :: wght(ncol)
     !
     ! output integrated wet deposition field
     !
@@ -1107,6 +1116,7 @@ contains
     ! OSLO_AERO begin
     call get_area_all_p(lchnk, ncol, area)
     area = area * rearth**2
+    call cnst_get_ind('H2SO4', id_h2so4, abort=.true.)
     ! OSLO_AERO end
 
     call get_wght_all_p(lchnk, ncol, wght)
@@ -1125,7 +1135,13 @@ contains
        if (gas_wetdep_method=='MOZ') then
           call outfld( wetdep_name(m), wrk_wd(:ncol),               ncol, lchnk )
           ! OSLO_AERO begin
-          call outfld( wetdep_name_area(m), wrk_wd(:ncol)/area(:ncol)  ,ncol, lchnk )
+          ! Save wd_a_h2so4
+          wrk_m2(:) = wrk_wd(:) / area(:)
+          call outfld( wetdep_name_area(m), wd_a_h2so4(:ncol)  ,ncol, lchnk )
+          if (m = id_h2so4) then
+             call pbuf_get_field(pbuf, idx_wd_a_h2so4, wd_a_h2so4)
+             wd_a_h2so4(:ncol) = wrk_m2(:)
+          end if
           ! OSLO_AERO end
           call outfld( wtrate_name(m), het_rates(:ncol,:,m), ncol, lchnk )
 

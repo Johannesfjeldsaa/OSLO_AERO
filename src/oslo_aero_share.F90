@@ -21,7 +21,7 @@ module oslo_aero_share
    !---------------------------
 
    public :: aero_register           ! register consituents
-   public :: sulfur_mass_fraction_register 
+   public :: sulfur_mass_fraction_register
    public :: soa_mass_fraction_register
    public :: is_process_mode         ! Check is an aerosol specie is a process mode
    public :: isAerosol               ! Check is specie is aerosol (i.e. gases get .FALSE. here)
@@ -334,7 +334,6 @@ contains
       ! instead of hard-coding it.
       !-----------------------------------------------------------------------
 
-      use mpishorthand
       use physics_buffer,  only: pbuf_add_field, dtype_r8
       use ppgrid,          only: pcols, pver, pverp
 
@@ -489,7 +488,7 @@ contains
 
    subroutine sulfur_mass_fraction_register
       !-----------------------------------------------------------------------
-      ! Register the sulfur mass fraction for the different tracers 
+      ! Register the sulfur mass fraction for the different tracers
       ! where sulfur is present. Both for the aerosol tracers and the
       ! gas phase tracers.
       !-----------------------------------------------------------------------
@@ -517,7 +516,7 @@ contains
 
    subroutine soa_mass_fraction_register
       !-----------------------------------------------------------------------
-      ! Register the sulfur mass fraction for the different tracers 
+      ! Register the sulfur mass fraction for the different tracers
       ! where sulfur is present. Both for the aerosol tracers and the
       ! gas phase tracers.
       !-----------------------------------------------------------------------
@@ -1145,7 +1144,7 @@ contains
       !
       !   SUBROUTINE: summation_fields_writeout
       !
-      !   DESCRIPTION: 
+      !   DESCRIPTION:
       !
       !   ARGUMENTS:
       !
@@ -1154,9 +1153,9 @@ contains
       ! --------------------------------------
       ! Arguments summation_fields_writeout
       ! --------------------------------------
-      integer,   intent(in)        :: lchnk 
+      integer,   intent(in)        :: lchnk
 
-      
+
    end subroutine summation_fields_writeout
 
 end module oslo_aero_share
