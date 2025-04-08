@@ -239,8 +239,10 @@ module oslo_aero_share
    real(r8) :: osmoticCoefficient(pcnst)
    real(r8) :: numberOfIons(pcnst)
    real(r8) :: solubleMassFraction(pcnst)
-   real(r8) :: sulfurMassFraction(pcnst)
-   real(r8) :: SOAMassFraction(pcnst)
+   real(r8) :: sulfurMassFraction(pcnst)   
+   real(r8) :: sulfurMassFraction_MSA
+   real(r8) :: SOAyield_isoprene
+   real(r8) :: SOAyield_monoterp
    integer  :: aerosolType(pcnst)
    real(r8) :: numberFractionAvailableAqChem(nbmodes)
    real(r8) :: invrhopart(pcnst)
@@ -493,7 +495,7 @@ contains
       ! where sulfur is present. Both for the aerosol tracers and the
       ! gas phase tracers.
       !-----------------------------------------------------------------------
-
+      
       sulfurMassFraction(:) = 0.0_r8
       ! for dms the sulfur mass fraction is assumed ~32/62=M_S/M_DMS since DMS is CH3SCH3
       sulfurMassFraction(l_dms) = 32.0_r8/62.0_r8
@@ -510,6 +512,11 @@ contains
       sulfurMassFraction(l_so4_a1) = 1.0_r8/3.06_r8
       sulfurMassFraction(l_so4_ac) = 1.0_r8/3.06_r8
       sulfurMassFraction(l_so4_pr) = 1.0_r8/3.06_r8
+      ! for h2so4 the sulfur mass fraction is assumed ~1/3.06 since ...
+      sulfurMassFraction(l_h2so4) = 1.0_r8/3.06_r8
+
+      ! for msa the sulfur mass fraction is assumed ~32/96 since ...
+      sulfurMassFraction_MSA = 32.0_r8/96.0_r8
 
    end subroutine sulfur_mass_fraction_register
 
@@ -517,16 +524,14 @@ contains
 
    subroutine soa_mass_fraction_register
       !-----------------------------------------------------------------------
-      ! Register the sulfur mass fraction for the different tracers 
-      ! where sulfur is present. Both for the aerosol tracers and the
-      ! gas phase tracers.
+      ! Register the SOA yield for the different tracers which 
+      ! can produce SOA.  
       !-----------------------------------------------------------------------
-
-      SOAMassFraction(:) = 0.0_r8
+      
       ! for isoprene the SOA mass fraction is assumed ~168/136 since ...
-      SOAMassFraction(l_isoprene) = 168.0_r8/68.0_r8
+      SOAyield_isoprene = 168.0_r8/68.0_r8
       ! for monoterpenes the SOA mass fraction is assumed ~168/136 since ...
-      SOAMassFraction(l_monoterp) = 168.0_r8/136.0_r8
+      SOAyield_monoterp = 168.0_r8/136.0_r8
 
    end subroutine soa_mass_fraction_register
 
@@ -1138,25 +1143,5 @@ contains
       end do
 
    end subroutine init_interp_constants
-
-   !===================================================
-   subroutine summation_fields_writeout(lchnk)
-      ! -----------------------------------------------------------------------
-      !
-      !   SUBROUTINE: summation_fields_writeout
-      !
-      !   DESCRIPTION: 
-      !
-      !   ARGUMENTS:
-      !
-      ! -----------------------------------------------------------------------
-
-      ! --------------------------------------
-      ! Arguments summation_fields_writeout
-      ! --------------------------------------
-      integer,   intent(in)        :: lchnk 
-
-      
-   end subroutine summation_fields_writeout
 
 end module oslo_aero_share

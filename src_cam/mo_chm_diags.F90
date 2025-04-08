@@ -10,6 +10,9 @@ module mo_chm_diags
   use cam_history,  only : fieldname_len
   use mo_jeuv,      only : neuv
   use gas_wetdep_opts,only : gas_wetdep_method
+  ! OSLO_AERO begin
+  use cam_abortutils, only : endrun
+  ! OSLO_AERO end
 
   implicit none
   private
@@ -51,6 +54,9 @@ module mo_chm_diags
   character(len=fieldname_len) :: wtrate_name(gas_pcnst)
   ! OSLO_AERO begin
   character(len=fieldname_len) :: wetdep_name_area(gas_pcnst)
+  real(r8), public, protected, allocatable   :: DF_SO2(:,:)
+  real(r8), public, protected, allocatable   :: WD_A_H2SO4(:,:)
+  real(r8), public, protected, allocatable   :: WD_A_SO2(:,:)
   ! OSLO_AERO end
 
   real(r8), parameter :: N_molwgt = 14.00674_r8
@@ -75,7 +81,8 @@ contains
     use phys_control,    only: history_aerosol_base,        &
                                history_aerosol_decomposed,  &   
                                history_gas
-
+    use ppgrid,          only: pcols, begchunk, endchunk
+    use cam_logfile,     only: iulog
     ! OSLO_AERO end
 
     integer :: j, k, m, n
@@ -111,6 +118,7 @@ contains
     logical :: history_dust
     ! OSLO_AERO begin
     integer :: cloudTracerIndex_direct
+    integer :: astat
     character(len=20) :: cloudTracerName
     ! OSLO_AERO end
 
@@ -122,8 +130,27 @@ contains
                        history_cesm_forcing_out = history_cesm_forcing, &
                        history_scwaccm_forcing_out = history_scwaccm_forcing, &
                        history_dust_out = history_dust ) 
-
-
+    ! OSLO_AERO begin
+    ! allocate module variables
+    allocate( DF_SO2(pcols, begchunk:endchunk), stat=astat )
+    if( astat/= 0 ) then
+      write(iulog,*) 'extfrc_inti: failed to allocate DF_SO2 array; error = ',astat
+      call endrun('extfrc_inti: failed to allocate DF_SO2 array')
+    end if
+    DF_SO2(:,:) = 0.0_r8
+    allocate( WD_A_H2SO4(pcols, begchunk:endchunk), stat=astat )
+    if( astat/= 0 ) then
+      write(iulog,*) 'extfrc_inti: failed to allocate WD_A_H2SO4 array; error = ',astat
+      call endrun('extfrc_inti: failed to allocate WD_A_H2SO4 array')
+    end if
+    WD_A_H2SO4(:,:) = 0.0_r8
+    allocate( WD_A_SO2(pcols, begchunk:endchunk), stat=astat )
+    if( astat/= 0 ) then
+      write(iulog,*) 'extfrc_inti: failed to allocate WD_A_SO2 array; error = ',astat
+      call endrun('extfrc_inti: failed to allocate WD_A_SO2 array')
+    end if
+    WD_A_SO2(:,:) = 0.0_r8
+    ! OSLO_AERO end
     id_bry     = get_spc_ndx( 'BRY' )
     id_cly     = get_spc_ndx( 'CLY' )
 
@@ -689,6 +716,7 @@ contains
     real(r8) :: wgt
     ! OSLO_AERO begin
     character(len=16) :: spc_name
+    integer           :: l_aero
     ! OSLO_AERO end
 
     !--------------------------------------------------------------------
@@ -727,6 +755,7 @@ contains
     call outfld( 'MASS', mass(:ncol,:), ncol, lchnk )
 
     ! OSLO_AERO begin
+   DF_SO2(:ncol,lchnk) = 0.0_r8
    cb_aerosol_type(:,:) = 0.0_r8
    cb_SULFUR_S(:) = 0.0_r8
    mmr_aerosol_type(:,:,:) = 0.0_r8
@@ -875,6 +904,12 @@ contains
          endif
 
       endif !Check if this is a chemistry tracer
+      
+
+      call cnst_get_ind(trim(solsym(m)), l_aero, abort=.false.)
+      if ( l_aero == l_so2 ) then 
+         DF_SO2(:ncol,lchnk) = DF_SO2(:ncol,lchnk) + depflx(:ncol,m)
+      endif
       ! OSLO_AERO end
 
        call outfld( depvel_name(m), depvel(:ncol,m), ncol ,lchnk )
@@ -1082,7 +1117,10 @@ contains
 
     use cam_history,  only : outfld
     ! OSLO_AERO begin
-    use phys_grid,    only : get_wght_all_p, get_area_all_p
+    use phys_grid,         only : get_wght_all_p, get_area_all_p
+    use mo_tracname,       only : solsym
+    use constituents,      only : cnst_get_ind
+    use oslo_aero_share,   only : l_so2, l_h2so4
     ! OSLO_AERO end
 
     integer,  intent(in)  :: lchnk
@@ -1094,6 +1132,7 @@ contains
     real(r8), dimension(ncol) :: noy_wk, sox_wk, nhx_wk, wrk_wd
     ! OSLO_AERO begin
     real(r8), dimension(ncol) :: area
+    integer                   :: l_aero
     ! OSLO_AERO end
     integer :: m, k
     real(r8) :: wght(ncol)
@@ -1105,6 +1144,8 @@ contains
     nhx_wk(:) = 0._r8
 
     ! OSLO_AERO begin
+    WD_A_SO2(:ncol,lchnk) = 0._r8
+    WD_A_H2SO4(:ncol,lchnk) = 0._r8
     call get_area_all_p(lchnk, ncol, area)
     area = area * rearth**2
     ! OSLO_AERO end
@@ -1125,7 +1166,14 @@ contains
        if (gas_wetdep_method=='MOZ') then
           call outfld( wetdep_name(m), wrk_wd(:ncol),               ncol, lchnk )
           ! OSLO_AERO begin
-          call outfld( wetdep_name_area(m), wrk_wd(:ncol)/area(:ncol)  ,ncol, lchnk )
+          ! get the index of the gas species that coresponds to the l_spcies system
+          call cnst_get_ind(trim(solsym(m)), l_aero, abort=.false.)
+          if ( l_aero == l_so2 ) then 
+             WD_A_SO2(:ncol,lchnk) = WD_A_SO2(:ncol,lchnk) + ( wrk_wd(:ncol) / area(:ncol) )
+          else if ( l_aero == l_h2so4 ) then
+             WD_A_H2SO4(:ncol,lchnk) = WD_A_H2SO4(:ncol,lchnk) + ( wrk_wd(:ncol) / area(:ncol) )
+          endif
+          call outfld( wetdep_name_area(m), wrk_wd(:ncol)/area(:ncol) ,ncol, lchnk )
           ! OSLO_AERO end
           call outfld( wtrate_name(m), het_rates(:ncol,:,m), ncol, lchnk )
 
