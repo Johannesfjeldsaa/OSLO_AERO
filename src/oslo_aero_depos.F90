@@ -233,30 +233,30 @@ contains
     enddo    !modes
    
    ! addfld and add_default for aerosol type deposition fields
-   ! all will have DDF, sulfate will have SDDF in addition
-   ! all except sulfate will have SFWET.
+   ! all will have dry, sulfate will have sulfur mass only in addition
+   ! all except sulfate will have wet.
    do n=1,N_AEROSOL_TYPES
-      
-      call addfld( trim(aerosol_type_name(n))//'DDF', horiz_only, 'A', unit_basename//'/m2/s ',  &
+
+      call addfld( 'dry_'//trim(aerosol_type_name(n)), horiz_only, 'A', unit_basename//'/m2/s ',  &
            trim(aerosol_type_name(n))//' dry deposition flux at bottom (grav + turb)')
 
-      if ( aerosolType(n) == AEROSOL_TYPE_SULFATE ) then
-         call addfld( trim(aerosol_type_name(n))//'_SDDF', horiz_only, 'A', unit_basename//'*S/m2/s ',  &
+      if ( n == AEROSOL_TYPE_SULFATE ) then
+         call addfld( 'dry_'//trim(aerosol_type_name(n))//'_S', horiz_only, 'A', unit_basename//'*S/m2/s ',  &
             trim(aerosol_type_name(n))//' dry deposition flux at bottom (grav + turb), sulfur mass only')
       else
-         call addfld(trim(aerosol_type_name(n))//'SFWET', horiz_only, 'A', unit_basename//'/m2/s', &
+         call addfld('wet_'//trim(aerosol_type_name(n)), horiz_only, 'A', unit_basename//'/m2/s', &
             trim(aerosol_type_name(n))//' wet deposition flux at surface')
       endif
       
       ! we require history_aerosol_base flag to add the fields to default output
       if ( history_aerosol_base ) then 
 
-         call add_default(trim(aerosol_type_name(n))//'DDF', 1, ' ')
+         call add_default('dry_'//trim(aerosol_type_name(n)), 1, ' ')
 
-         if ( aerosolType(n) == AEROSOL_TYPE_SULFATE ) then 
-            call add_default(trim(aerosol_type_name(n))//'_SDDF', 1, ' ')
+         if ( n == AEROSOL_TYPE_SULFATE ) then 
+            call add_default('dry_'//trim(aerosol_type_name(n))//'_S', 1, ' ')
          else 
-            call add_default(trim(aerosol_type_name(n))//'SFWET', 1, ' ')
+            call add_default('wet_'//trim(aerosol_type_name(n)), 1, ' ')
          endif
          
       endif
@@ -600,10 +600,10 @@ contains
     endif
 
    do n=1,N_AEROSOL_TYPES
-      ! add the DDF rate of the compound aerosols to output
-      call outfld(trim(aerosol_type_name(n))//'DDF', sflx_DDF_arosol_type(:ncol,n), ncol, lchnk)
-      if ( aerosolType(n) == AEROSOL_TYPE_SULFATE ) then 
-         call outfld(trim(aerosol_type_name(n))//'_SDDF', sflx_DDF_SULFATE_S(:ncol), ncol, lchnk)
+      ! add the dry deposition rate of the compound aerosols to output
+      call outfld('dry_'//trim(aerosol_type_name(n)), sflx_DDF_arosol_type(:ncol,n), ncol, lchnk)
+      if ( n == AEROSOL_TYPE_SULFATE ) then 
+         call outfld('dry_'//trim(aerosol_type_name(n))//'_S', sflx_DDF_SULFATE_S(:ncol), ncol, lchnk)
       endif
    end do
 
@@ -980,10 +980,10 @@ contains
       enddo   ! lphase = 1, 2
    enddo   ! m = 1, ntot_amode
 
-   ! add the SFWET rate of the compound aerosols except sulfur to output
+   ! add the wet deposition rate of the compound aerosols except sulfur to output
    do n=1,N_AEROSOL_TYPES
-      if ( aerosolType(n) /= AEROSOL_TYPE_SULFATE ) then 
-         call outfld(trim(aerosol_type_name(n))//'SFWET', sflx_SFWET_arosol_type(:ncol,n), ncol, lchnk)
+      if ( n /= AEROSOL_TYPE_SULFATE ) then 
+         call outfld('wet_'//trim(aerosol_type_name(n)), sflx_SFWET_arosol_type(:ncol,n), ncol, lchnk)
       endif
    end do
 
