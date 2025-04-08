@@ -377,7 +377,6 @@ contains
     use mo_chem_utls,  only : get_spc_ndx
     ! OSLO_AERO begin
     use constituents,    only : cnst_get_ind
-    use oslo_aero_share, only : l_bc_ax, l_bc_ni, l_bc_n
     ! OSLO_AERO end
 
     implicit none
@@ -412,7 +411,6 @@ contains
 
     frcing(:,:,:) = 0._r8
     !OSLO_AERO begin 
-    BC_CMXF(:,lchnk) = 0.0_r8
     CMXF_fields(:ncol,:,lchnk) = 0.0_r8
     !OSLO_AERO end
 
@@ -449,10 +447,6 @@ contains
           ! get the index of the forcing index that coresponds to the l_spc system
           call cnst_get_ind(trim(extfrc_lst(n)), l_aero, abort=.false.)
           CMXF_fields(:ncol,l_aero,lchnk) = CMXF_fields(:ncol,l_aero,lchnk) + frcing_col_kg(:ncol)
-
-          if ( l_aero == l_bc_ax .or. l_aero == l_bc_ni .or. l_aero == l_bc_n ) then
-             BC_CMXF(:ncol,lchnk) = BC_CMXF(:ncol,lchnk) + frcing_col_kg(:ncol)
-          end if
           !OSLO_AERO end
 
           xfcname = trim(extfrc_lst(n))//'_CLXF'
