@@ -258,6 +258,7 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
   use cam_history,      only : outfld
 !
   ! OSLO_AERO begin
+  use oslo_aero_share,  only : sulfurMassFraction
   use oslo_aero_share,  only : l_so2, l_h2so4
   use physics_buffer,   only : physics_buffer_desc, pbuf_get_field, pbuf_get_index
   use constituents,     only : cnst_get_ind
@@ -532,6 +533,9 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
       call outfld('WD_A_'//trim(gas_wetdep_list(m)),wrk_wd(:ncol),ncol,lchnk)
 
       if ( l_aero == l_so2 ) then
+        call outfld('wet_SO2', wrk_wd(:ncol), ncol, lchnk)
+        call outfld('wet_SO2_S', ( wrk_wd(:ncol) * sulfurMassFraction(l_so2) ), ncol, lchnk)
+
         WD_A_SO2_NEU(:ncol,lchnk) = WD_A_SO2_NEU(:ncol,lchnk) + wrk_wd(:ncol)
       endif
 

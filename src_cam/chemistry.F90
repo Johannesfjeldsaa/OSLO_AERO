@@ -1697,10 +1697,6 @@ contains
          'SO2 emission, sulfur mass only.')
       call addfld ('sour_SO2_S', horiz_only, 'A',  'kg*S/m2/s',   &
          'SO2 source, sulfur mass only.')
-      call addfld ('wet_SO2', horiz_only, 'A',  'kg/m2/s',   &
-         'SO2 wet deposition flux at surface.')
-      call addfld ('wet_SO2_S', horiz_only, 'A',  'kg*S/m2/s',   &
-         'SO2 wet deposition flux at surface, sulfur mass only.')
       call addfld ('sink_SO2_S', horiz_only, 'A',  'kg*S/m2/s',   &
          'SO2 sink, sulfur mass only.')
       call addfld ('chloss_SO2_S', horiz_only, 'A',  'kg*S/m2/s',   &
@@ -1741,8 +1737,6 @@ contains
          call add_default( 'emis_SO2', 1, ' ' )
          call add_default( 'emis_SO2_S', 1, ' ' )
          call add_default( 'sour_SO2_S', 1, ' ' )
-         call add_default( 'wet_SO2', 1, ' ' )
-         call add_default( 'wet_SO2_S', 1, ' ' )
          call add_default( 'sink_SO2_S', 1, ' ' )
          ! SULFATE
          call add_default( 'emis_SULFATE', 1, ' ' )
@@ -1783,7 +1777,6 @@ contains
       !                - DMS: chemical loss
       !                - SO2: emission/sulfur emmissions,
       !                    source /sulfur source,
-      !                    wet deposition/sulfur wet deposition,
       !                    sink/sulfur sink
       !                    and chemical loss
       !                - SULFATE: emission/sulfur emmissions,
@@ -1853,8 +1846,6 @@ contains
       real(r8)                      :: emis_SO2(pcols)
       real(r8)                      :: emis_SO2_S(pcols)
       real(r8)                      :: sour_SO2_S(pcols)
-      real(r8)                      :: wet_SO2(pcols)
-      real(r8)                      :: wet_SO2_S(pcols)
       real(r8)                      :: sink_SO2_S(pcols)
       real(r8)                      :: chloss_SO2_S(pcols)
       real(r8)                      :: chlossg_SO2_S(pcols)
@@ -1883,8 +1874,6 @@ contains
       emis_SO2(:) = 0._r8
       emis_SO2_S(:) = 0._r8
       sour_SO2_S(:) = 0._r8
-      wet_SO2(:) = 0._r8
-      wet_SO2_S(:) = 0._r8
       sink_SO2_S(:) = 0._r8
       chloss_SO2_S(:) = 0._r8
       chlossg_SO2_S(:) = 0._r8
@@ -1940,9 +1929,6 @@ contains
       emis_SO2_S(:ncol) = ( SFSO2(:ncol, lchnk) + CMXF_fields(:ncol, l_so2, lchnk) ) * sulfurMassFraction(l_so2)
       ! sour_SO2
       sour_SO2_S(:ncol) = emis_SO2_S(:ncol) + SO2_formed_from_DMS_as_S(:ncol)
-      ! wet deposition SO2
-      wet_SO2(:ncol) = WD_A_SO2_local_(:ncol)
-      wet_SO2_S(:ncol) = WD_A_SO2_local_(:ncol) * sulfurMassFraction(l_so2)
       ! sink SO2
       sink_SO2_S(:ncol) = ( ( - WD_A_SO2_local_(:ncol)         - &
            DF_SO2(:ncol, lchnk)                                + &
@@ -2009,8 +1995,6 @@ contains
       call outfld('emis_SO2', emis_SO2(:), ncol, lchnk)
       call outfld('emis_SO2_S', emis_SO2_S(:), ncol, lchnk)
       call outfld('sour_SO2_S', sour_SO2_S(:), ncol, lchnk)
-      call outfld('wet_SO2', wet_SO2(:), ncol, lchnk)
-      call outfld('wet_SO2_S', wet_SO2_S(:), ncol, lchnk)
       call outfld('sink_SO2_S', sink_SO2_S(:), ncol, lchnk)
       call outfld('chloss_SO2_S', chloss_SO2_S(:), ncol, lchnk)
       call outfld('chlossg_SO2_S', chlossg_SO2_S(:), ncol, lchnk)
