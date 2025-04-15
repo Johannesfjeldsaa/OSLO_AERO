@@ -1944,7 +1944,7 @@ contains
       wet_SO2(:ncol) = WD_A_SO2_local_(:ncol)
       wet_SO2_S(:ncol) = WD_A_SO2_local_(:ncol) * sulfurMassFraction(l_so2)
       ! sink SO2
-      sink_SO2_S(:ncol) = ( ( WD_A_SO2_local_(:ncol)           + &
+      sink_SO2_S(:ncol) = ( ( - WD_A_SO2_local_(:ncol)         - &
            DF_SO2(:ncol, lchnk)                                + &
            AQ_SO2(:ncol, lchnk)                                + &
            GS_SO2(:ncol, lchnk)                                - &
