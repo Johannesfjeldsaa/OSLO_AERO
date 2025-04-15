@@ -55,12 +55,13 @@ module mo_chm_diags
   ! OSLO_AERO begin
   character(len=fieldname_len) :: wetdep_name_area(gas_pcnst)
   real(r8), public, protected, allocatable   :: DF_SO2(:,:)
-  real(r8), public, protected, allocatable   :: WD_A_H2SO4(:,:)
   real(r8), public, protected, allocatable   :: WD_A_SO2(:,:)
   ! OSLO_AERO end
 
   real(r8), parameter :: N_molwgt = 14.00674_r8
   real(r8), parameter :: S_molwgt = 32.066_r8
+
+  integer :: idx_wd_a_h2so4 = -1
 
 contains
 
@@ -79,7 +80,7 @@ contains
     use oslo_aero_share, only: aerosol_type_name, N_AEROSOL_TYPES, AEROSOL_TYPE_SULFATE
     use oslo_aero_share, only: l_so2, l_dms
     use phys_control,    only: history_aerosol_base,        &
-                               history_aerosol_decomposed,  &   
+                               history_aerosol_decomposed,  &
                                history_gas
     use ppgrid,          only: pcols, begchunk, endchunk
     use cam_logfile,     only: iulog
@@ -129,25 +130,19 @@ contains
                        history_chemspecies_srf_out = history_chemspecies_srf, &
                        history_cesm_forcing_out = history_cesm_forcing, &
                        history_scwaccm_forcing_out = history_scwaccm_forcing, &
-                       history_dust_out = history_dust ) 
+                       history_dust_out = history_dust )
     ! OSLO_AERO begin
     ! allocate module variables
     allocate( DF_SO2(pcols, begchunk:endchunk), stat=astat )
     if( astat/= 0 ) then
-      write(iulog,*) 'extfrc_inti: failed to allocate DF_SO2 array; error = ',astat
-      call endrun('extfrc_inti: failed to allocate DF_SO2 array')
+      write(iulog,*) 'chm_diags_inti: failed to allocate DF_SO2 array; error = ',astat
+      call endrun('chm_diags_inti: failed to allocate DF_SO2 array')
     end if
     DF_SO2(:,:) = 0.0_r8
-    allocate( WD_A_H2SO4(pcols, begchunk:endchunk), stat=astat )
-    if( astat/= 0 ) then
-      write(iulog,*) 'extfrc_inti: failed to allocate WD_A_H2SO4 array; error = ',astat
-      call endrun('extfrc_inti: failed to allocate WD_A_H2SO4 array')
-    end if
-    WD_A_H2SO4(:,:) = 0.0_r8
     allocate( WD_A_SO2(pcols, begchunk:endchunk), stat=astat )
     if( astat/= 0 ) then
-      write(iulog,*) 'extfrc_inti: failed to allocate WD_A_SO2 array; error = ',astat
-      call endrun('extfrc_inti: failed to allocate WD_A_SO2 array')
+      write(iulog,*) 'chm_diags_inti: failed to allocate WD_A_SO2 array; error = ',astat
+      call endrun('chm_diags_inti: failed to allocate WD_A_SO2 array')
     end if
     WD_A_SO2(:,:) = 0.0_r8
     ! OSLO_AERO end
@@ -389,10 +384,10 @@ contains
          flag_xyfill=.True. )
 !
     do m = 1,gas_pcnst
-       
-       ! get the species name 
+
+       ! get the species name
        spc_name = trim(solsym(m))
-       
+
        ! ant then get the index of the constituent, is -1 if spc_name is not recongniced
        call cnst_get_ind(spc_name, n, abort=.false. )
        if ( n > 0 ) then
@@ -499,30 +494,30 @@ contains
        endif
 
       ! OSLO_AERO begin
-      ! Add the 3D consentrations 
-      if ( n > 0 ) then 
+      ! Add the 3D consentrations
+      if ( n > 0 ) then
          ! if history_aerosol_decomposed we add the aerosol species
          if ( (any( aer_species == m ) .or. isAerosol(n)) ) then
             if ( history_aerosol_decomposed ) then
                call add_default( spc_name, 1, ' ' )
             endif
          ! if it is not an aerosol species it is a gas species and we then require the history_gas flag
-         else 
-            if ( history_gas ) then 
+         else
+            if ( history_gas ) then
                call add_default( spc_name, 1, ' ' )
             endif
          endif
       elseif ( trim(spc_name) == 'H2O' ) then
-         if ( history_gas ) then 
+         if ( history_gas ) then
             call add_default( spc_name, 1, ' ' )
          endif
-      endif 
+      endif
 
       if(n > 0) then
          ! Add cloud tracers to default output
          cloudTracerIndex_direct = getCloudTracerIndexDirect(n)
          if ( cloudTracerIndex_direct > 0 ) then
-            ! first the 3d fields, 
+            ! first the 3d fields,
             cloudTracerName = getCloudTracerName(n)
             call addfld( trim(cloudTracerName), (/'lev'/), 'A','kg/kg', &
                trim(cloudTracerName)//' in cloud water')
@@ -533,17 +528,17 @@ contains
             ! and then then add column burden of cloud tracers
             call addfld('cb_'//trim(cloudTracerName),horiz_only, 'A', 'kg/m2', &
                'cb_'//trim(cloudTracerName)//' column in cloud water')
-            if ( history_aerosol_decomposed ) then 
+            if ( history_aerosol_decomposed ) then
                call add_default('cb_'//trim(cloudTracerName),1,' ')
             endif
          endif
-          
-         ! ... Then add the column burden in clean air 
+
+         ! ... Then add the column burden in clean air
          call addfld('cb_'//trim(spc_name),horiz_only, 'A', 'kg/m2', &
             'cb_'//trim(spc_name)//' in column')
 
          ! ... and if it is so2 or dms we add the column burden of the sulfur
-         if ( n == l_so2 .or. n == l_dms ) then 
+         if ( n == l_so2 .or. n == l_dms ) then
             call addfld(trim('cb_'//trim(spc_name)//'_S'), horiz_only, 'A', 'kg*S/m2', &
                'cb_'//trim(spc_name)//' column, sulfur mass only')
          endif
@@ -554,15 +549,15 @@ contains
                call add_default('cb_'//trim(spc_name),1,' ' )
             endif
          ! else, if it is a gasphase the cb is included in the base so we require history_aerosol_base flag
-         else 
-            if ( history_aerosol_base ) then 
+         else
+            if ( history_aerosol_base ) then
                call add_default('cb_'//trim(spc_name), 1, ' ')
                ! if it is so2 or dms we add the column burden of the sulfur
-               if ( n == l_so2 .or. n == l_dms ) then 
+               if ( n == l_so2 .or. n == l_dms ) then
                   call add_default(trim('cb_'//trim(spc_name)//'_S'), 1, ' ')
                endif
             endif
-         endif 
+         endif
 
          if (history_aerosol) then
             if (cloudTracerIndex_direct > 0) then
@@ -587,20 +582,20 @@ contains
    ! OSLO_AERO begin
    ! iterate over the compounded aerosol types
    do n=1,N_AEROSOL_TYPES
-      
+
       ! add the column burden of the compound aerosols to output
       call addfld('cb_'//trim(aerosol_type_name(n)),horiz_only, 'A', 'kg/m2',&
          'cb_'//trim(aerosol_type_name(n))//' column of aerosol type')
-      if ( n == AEROSOL_TYPE_SULFATE ) then 
+      if ( n == AEROSOL_TYPE_SULFATE ) then
          call addfld('cb_'//trim(aerosol_type_name(n))//'_S',horiz_only, 'A', 'kg*S/m2',&
          'cb_'//trim(aerosol_type_name(n))//' column of aerosol, sulfur mass only')
       endif
       ! we require history_aerosol_base flag
-      if ( history_aerosol_base ) then 
+      if ( history_aerosol_base ) then
          call add_default('cb_'//trim(aerosol_type_name(n)), 1, ' ')
 
          ! if the aerosol type is sulfur we make a version of the column burden that is only the sulfur
-         if ( n == AEROSOL_TYPE_SULFATE ) then 
+         if ( n == AEROSOL_TYPE_SULFATE ) then
             call add_default('cb_'//trim(aerosol_type_name(n))//'_S', 1, ' ')
          endif
       endif
@@ -656,7 +651,7 @@ contains
     use physics_buffer, only : physics_buffer_desc
     !
     use oslo_aero_share,only : getCloudTracerIndexDirect, getCloudTracerName, aerosolType, isAerosol
-    use oslo_aero_share,only : aerosol_type_name, N_AEROSOL_TYPES, AEROSOL_TYPE_SULFATE
+    use oslo_aero_share,only : aerosol_type_name, N_AEROSOL_TYPES, AEROSOL_TYPE_SULFATE, AEROSOL_TYPE_BC
     use oslo_aero_share,only : sulfurMassFraction, l_so2, l_dms
     ! OSLO_AERO end
 !
@@ -872,10 +867,10 @@ contains
          endif
 
          ! Add the column burden of the cloud tracer to the aerosol type cb
-         if ( aerosolType(n) > 0 ) then
+         if ( aerosolType(n) > 0 .and. cloudTracerIndex_direct > 0 ) then
             ! column burden in terms of aerosol type mass
             cb_aerosol_type(:ncol,aerosolType(n)) = cb_aerosol_type(:ncol,aerosolType(n)) + cb(:ncol)
-            
+
             ! column burden in terms of sulfur mass for sulfate aerosol
             if (aerosolType(n) == AEROSOL_TYPE_SULFATE) then
                cb_SULFUR_S(:ncol) = cb_SULFUR_S(:ncol) + ( cb(:ncol) * sulfurMassFraction(n) )
@@ -886,7 +881,7 @@ contains
          mass_tmp(:ncol,:) = mmr(:ncol,:,m) * pdel(:ncol,:) * rgrav
          cb(:ncol) = sum(mass_tmp(:ncol,:),2)
          call outfld(trim('cb_'//trim(spc_name)), cb, pcols, lchnk)
-         if ( n == l_so2 .or. n == l_dms ) then 
+         if ( n == l_so2 .or. n == l_dms ) then
             call outfld(trim('cb_'//trim(spc_name)//'_S'), ( cb(:ncol) * sulfurMassFraction(n) ), pcols, lchnk)
          endif
 
@@ -904,10 +899,9 @@ contains
          endif
 
       endif !Check if this is a chemistry tracer
-      
 
       call cnst_get_ind(trim(solsym(m)), l_aero, abort=.false.)
-      if ( l_aero == l_so2 ) then 
+      if ( l_aero == l_so2 ) then
          DF_SO2(:ncol,lchnk) = DF_SO2(:ncol,lchnk) + depflx(:ncol,m)
       endif
       ! OSLO_AERO end
@@ -1113,14 +1107,17 @@ contains
 
   end subroutine chm_diags
 
-  subroutine het_diags( het_rates, mmr, pdel, lchnk, ncol )
+  subroutine het_diags( het_rates, mmr, pdel, lchnk, ncol, pbuf )
 
-    use cam_history,  only : outfld
+    use cam_history,    only: outfld
     ! OSLO_AERO begin
     use phys_grid,         only : get_wght_all_p, get_area_all_p
     use mo_tracname,       only : solsym
     use constituents,      only : cnst_get_ind
     use oslo_aero_share,   only : l_so2, l_h2so4
+    use constituents,   only: cnst_get_ind
+    use phys_grid,      only: get_wght_all_p, get_area_all_p
+    use physics_buffer, only: physics_buffer_desc, pbuf_get_field, pbuf_get_index
     ! OSLO_AERO end
 
     integer,  intent(in)  :: lchnk
@@ -1129,13 +1126,18 @@ contains
     real(r8), intent(in)  :: mmr(ncol,pver,gas_pcnst)
     real(r8), intent(in)  :: pdel(ncol,pver)
 
+    type(physics_buffer_desc), pointer :: pbuf(:)
+
     real(r8), dimension(ncol) :: noy_wk, sox_wk, nhx_wk, wrk_wd
     ! OSLO_AERO begin
-    real(r8), dimension(ncol) :: area
-    integer                   :: l_aero
+    integer           :: l_aero
+    integer           :: id_h2so4
+    real(r8)          :: area(ncol)
+    real(r8)          :: wrk_m2(ncol)
+    real(r8), pointer :: wd_a_h2so4(:)
     ! OSLO_AERO end
-    integer :: m, k
-    real(r8) :: wght(ncol)
+    integer           :: m, k
+    real(r8)          :: wght(ncol)
     !
     ! output integrated wet deposition field
     !
@@ -1145,7 +1147,6 @@ contains
 
     ! OSLO_AERO begin
     WD_A_SO2(:ncol,lchnk) = 0._r8
-    WD_A_H2SO4(:ncol,lchnk) = 0._r8
     call get_area_all_p(lchnk, ncol, area)
     area = area * rearth**2
     ! OSLO_AERO end
@@ -1163,18 +1164,34 @@ contains
        !
        wrk_wd(:ncol) = wrk_wd(:ncol) * rgrav * wght(:ncol) * rearth**2
        !
+
        if (gas_wetdep_method=='MOZ') then
-          call outfld( wetdep_name(m), wrk_wd(:ncol),               ncol, lchnk )
+          call outfld( wetdep_name(m), wrk_wd(:ncol), ncol, lchnk )
+
           ! OSLO_AERO begin
           ! get the index of the gas species that coresponds to the l_spcies system
           call cnst_get_ind(trim(solsym(m)), l_aero, abort=.false.)
-          if ( l_aero == l_so2 ) then 
-             WD_A_SO2(:ncol,lchnk) = WD_A_SO2(:ncol,lchnk) + ( wrk_wd(:ncol) / area(:ncol) )
-          else if ( l_aero == l_h2so4 ) then
-             WD_A_H2SO4(:ncol,lchnk) = WD_A_H2SO4(:ncol,lchnk) + ( wrk_wd(:ncol) / area(:ncol) )
+
+          ! compute the wet deposition rate per unit area
+          wrk_m2(:) = wrk_wd(:) / area(:)
+
+          if ( l_aero == l_so2 ) then
+             WD_A_SO2(:ncol,lchnk) = WD_A_SO2(:ncol,lchnk) + wrk_m2(:ncol)
           endif
-          call outfld( wetdep_name_area(m), wrk_wd(:ncol)/area(:ncol) ,ncol, lchnk )
+
+          ! Save the WD_A field to the wd_a_h2so4 pointer if l_aero == l_h2so4
+          ! this field is passed to the pbuf
+          if (l_aero == l_h2so4) then
+
+             idx_wd_a_h2so4 = pbuf_get_index('WD_A_H2SO4')
+
+             call pbuf_get_field(pbuf, idx_wd_a_h2so4, wd_a_h2so4)
+             wd_a_h2so4(:ncol) = wrk_m2(:)
+          end if
+
+          call outfld( wetdep_name_area(m), wrk_m2(:), ncol, lchnk )
           ! OSLO_AERO end
+
           call outfld( wtrate_name(m), het_rates(:ncol,:,m), ncol, lchnk )
 
           if ( any(noy_species == m ) ) then

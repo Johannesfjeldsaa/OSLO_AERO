@@ -55,7 +55,7 @@ module aero_model
    use oslo_aero_ocean,          only: oslo_aero_ocean_init, oslo_aero_dms_emis
    use oslo_aero_share,          only: getNumberofTracersInMode, getCloudTracerIndexDirect, getCloudTracerName
    use oslo_aero_share,          only: getCloudTracerName, getTracerIndex, aero_register
-   use oslo_aero_share,          only: sulfur_mass_fraction_register, soa_mass_fraction_register
+   use oslo_aero_share,          only: sulfur_mass_fraction_register, soa_yield_register
    use oslo_aero_sox_cldaero,    only: sox_cldaero_init
    use oslo_aero_microp,         only: oslo_aero_microp_readnl
    use oslo_aero_sw_tables,      only: initopt
@@ -151,12 +151,16 @@ contains
 
    !=============================================================================
    subroutine aero_model_register()
+      use oslo_aero_share, only: aero_register
+      use oslo_aero_depos, only: oslo_aero_depos_register
 
       call aero_register()
-      
+
+      call oslo_aero_depos_register()
+
       call sulfur_mass_fraction_register()
 
-      call soa_mass_fraction_register()
+      call soa_yield_register()
 
    end subroutine aero_model_register
 
@@ -177,56 +181,56 @@ contains
       ! allocate module variables
       allocate( GS_SOA(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'extfrc_inti: failed to allocate GS_SOA array; error = ',astat
-         call endrun('extfrc_inti: failed to allocate GS_SOA array')
+         write(iulog,*) 'aero_model_init: failed to allocate GS_SOA array; error = ',astat
+         call endrun('aero_model_init: failed to allocate GS_SOA array')
       end if
       GS_SOA(:,:) = 0.0_r8
       allocate( GS_H2SO4(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'extfrc_inti: failed to allocate GS_H2SO4 array; error = ',astat
-         call endrun('extfrc_inti: failed to allocate GS_H2SO4 array')
+         write(iulog,*) 'aero_model_init: failed to allocate GS_H2SO4 array; error = ',astat
+         call endrun('aero_model_init: failed to allocate GS_H2SO4 array')
       end if
       GS_H2SO4(:,:) = 0.0_r8
       allocate( GS_DMS(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'extfrc_inti: failed to allocate GS_DMS array; error = ',astat
-         call endrun('extfrc_inti: failed to allocate GS_DMS array')
+         write(iulog,*) 'aero_model_init: failed to allocate GS_DMS array; error = ',astat
+         call endrun('aero_model_init: failed to allocate GS_DMS array')
       end if
       GS_DMS(:,:) = 0.0_r8
       allocate( GS_SO2(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'extfrc_inti: failed to allocate GS_SO2 array; error = ',astat
-         call endrun('extfrc_inti: failed to allocate GS_SO2 array')
+         write(iulog,*) 'aero_model_init: failed to allocate GS_SO2 array; error = ',astat
+         call endrun('aero_model_init: failed to allocate GS_SO2 array')
       end if
       GS_SO2(:,:) = 0.0_r8
       allocate( GS_isoprene(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'extfrc_inti: failed to allocate GS_isoprene array; error = ',astat
-         call endrun('extfrc_inti: failed to allocate GS_isoprene array')
+         write(iulog,*) 'aero_model_init: failed to allocate GS_isoprene array; error = ',astat
+         call endrun('aero_model_init: failed to allocate GS_isoprene array')
       end if
       GS_isoprene(:,:) = 0.0_r8
       allocate( GS_monoterp(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'extfrc_inti: failed to allocate GS_monoterp array; error = ',astat
-         call endrun('extfrc_inti: failed to allocate GS_monoterp array')
+         write(iulog,*) 'aero_model_init: failed to allocate GS_monoterp array; error = ',astat
+         call endrun('aero_model_init: failed to allocate GS_monoterp array')
       end if
       GS_monoterp(:,:) = 0.0_r8
       allocate( AQ_H2SO4(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'extfrc_inti: failed to allocate AQ_H2SO4 array; error = ',astat
-         call endrun('extfrc_inti: failed to allocate AQ_H2SO4 array')
+         write(iulog,*) 'aero_model_init: failed to allocate AQ_H2SO4 array; error = ',astat
+         call endrun('aero_model_init: failed to allocate AQ_H2SO4 array')
       end if
       AQ_H2SO4(:,:) = 0.0_r8
       allocate( AQ_SO4_A2_OCW(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'extfrc_inti: failed to allocate AQ_SO4_A2_OCW array; error = ',astat
-         call endrun('extfrc_inti: failed to allocate AQ_SO4_A2_OCW array')
+         write(iulog,*) 'aero_model_init: failed to allocate AQ_SO4_A2_OCW array; error = ',astat
+         call endrun('aero_model_init: failed to allocate AQ_SO4_A2_OCW array')
       end if
       AQ_SO4_A2_OCW(:,:) = 0.0_r8
       allocate( AQ_SO2(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'extfrc_inti: failed to allocate AQ_SO2 array; error = ',astat
-         call endrun('extfrc_inti: failed to allocate AQ_SO2 array')
+         write(iulog,*) 'aero_model_init: failed to allocate AQ_SO2 array; error = ',astat
+         call endrun('aero_model_init: failed to allocate AQ_SO2 array')
       end if
       AQ_SO2(:,:) = 0.0_r8
 
@@ -297,23 +301,23 @@ contains
          endif
 
          call cnst_get_ind(solsym(m), n, abort=.false. )
-         if ( n == l_dms .or. n == l_isoprene .or. n == l_monoterp ) then 
-            
+         if ( n == l_dms .or. n == l_isoprene .or. n == l_monoterp ) then
+
             call addfld( 'sink_'//trim(solsym(m)),horiz_only, 'A', unit_basename//'/m2/s ', &
                trim(solsym(m))//' sink')
             if ( n == l_dms ) then
                call addfld( 'sink_'//trim(solsym(m))//'_S',horiz_only, 'A', 'kg*S/m2/s ', &
                   trim(solsym(m))//' sink, sulfur mass only')
             endif
-            
-            if ( history_aerosol_base ) then 
+
+            if ( history_aerosol_base ) then
                call add_default( 'sink_'//trim(solsym(m)), 1, ' ')
                if ( n == l_dms ) then
                   call add_default( 'sink_'//trim(solsym(m))//'_S', 1, ' ')
                endif
             endif
          endif
-            
+
       enddo
 
       call addfld ('NUCLRATE',(/'lev'/), 'A','#/cm3/s','Nucleation rate')
@@ -426,20 +430,20 @@ contains
       ! local vars
       integer :: beglev(ncol)
       integer :: endlev(ncol)
-   
+
       integer :: i,k
 
       beglev(:ncol)=ltrop(:ncol)+1
       endlev(:ncol)=pver
 
-      ! diameter left out as an argument                                                       
-         call surf_area_dens(ncol, mmr, pmid, temp, beglev, endlev, sad_trop, reff_trop, sfc=sfc) 
+      ! diameter left out as an argument
+         call surf_area_dens(ncol, mmr, pmid, temp, beglev, endlev, sad_trop, reff_trop, sfc=sfc)
 
-         do i = 1,ncol                                                                            
-            do k = ltrop(i)+1, pver                                                               
-               ! djlo : do not use the 0-th mode                                                  
+         do i = 1,ncol
+            do k = ltrop(i)+1, pver
+               ! djlo : do not use the 0-th mode
                dm_aer(i,k,:) = 2._r8 * lifeCycleNumberMedianRadius(1:nmodes_oslo) * 1.e-2_r8 ! radius ==> diameter, m ==> cm
-            enddo                                                                                 
+            enddo
          enddo
 
    end subroutine aero_model_surfarea
@@ -464,7 +468,7 @@ contains
 
       ! local vars
       integer :: beglev(ncol)
-      integer :: endlev(ncol)   
+      integer :: endlev(ncol)
 
       reff_strat = 0._r8
       strato_sad = 0._r8
@@ -485,8 +489,8 @@ contains
          zm,  qh2o, cwat, cldfr, cldnum, &
          airdens, invariants, del_h2so4_gasprod,  &
          vmr0, vmr, pbuf )
-      
-      ! use 
+
+      ! use
       use oslo_aero_share,    only : sulfurMassFraction
       use oslo_aero_share,    only : l_soa_lv, l_soa_sv, l_h2so4, l_so4_a2, l_dms, l_isoprene, l_monoterp, l_so2
 
@@ -562,7 +566,7 @@ contains
       ! calculate tendency due to gas phase chemistry and processes
       dvmrdt(:ncol,:,:) = (vmr(:ncol,:,:) - vmr0(:ncol,:,:)) / delt
       do m = 1, gas_pcnst
- 
+
          ! get the index of the gas species that coresponds to the l_spcies system
          call cnst_get_ind(trim(solsym(m)), l_aero, abort=.false.)
 
@@ -575,25 +579,25 @@ contains
             GS_SOA(:ncol,lchnk) = GS_SOA(:ncol,lchnk) + wrk(:ncol)
          else if ( l_aero == l_h2so4 ) then
             GS_H2SO4(:ncol,lchnk) = GS_H2SO4(:ncol,lchnk) + wrk(:ncol)
-         else if ( l_aero == l_dms ) then 
+         else if ( l_aero == l_dms ) then
             GS_DMS(:ncol, lchnk) = GS_DMS(:ncol,lchnk) + wrk(:ncol)
-         else if ( l_aero == l_so2) then 
+         else if ( l_aero == l_so2) then
             GS_SO2(:ncol, lchnk) = GS_SO2(:ncol,lchnk) + wrk(:ncol)
-         else if ( l_aero == l_isoprene ) then 
+         else if ( l_aero == l_isoprene ) then
             GS_isoprene(:ncol, lchnk) = GS_isoprene(:ncol,lchnk) + wrk(:ncol)
-         else if ( l_aero == l_monoterp ) then 
+         else if ( l_aero == l_monoterp ) then
             GS_monoterp(:ncol, lchnk) = GS_monoterp(:ncol,lchnk) + wrk(:ncol)
          endif
          name = 'GS_'//trim(solsym(m))
          call outfld( name, wrk(:ncol), ncol, lchnk )
-         
-         if ( l_aero == l_dms .or. l_aero == l_isoprene .or. l_aero == l_monoterp) then 
+
+         if ( l_aero == l_dms .or. l_aero == l_isoprene .or. l_aero == l_monoterp) then
             call outfld( 'sink_'//trim(solsym(m)), wrk(:ncol), ncol, lchnk )
             if ( l_aero == l_dms ) then
-               call outfld( 'sink_'//trim(solsym(m))//'_S', ( wrk(:ncol) * sulfurMassFraction(n) ) , ncol, lchnk )
+               call outfld( 'sink_'//trim(solsym(m))//'_S', ( wrk(:ncol) * sulfurMassFraction(l_aero) ) , ncol, lchnk )
             endif
          endif
-         
+
       enddo
 
       ! Get mass mixing ratios at start of time step
@@ -649,9 +653,9 @@ contains
             wrk(:ncol) = wrk(:ncol) + dvmrdt_sv1(:ncol,k,m)*adv_mass(m)/mbar(:ncol,k)*pdel(:ncol,k)/gravit
          end do
 
-         if ( l_aero == l_h2so4) then 
+         if ( l_aero == l_h2so4) then
             AQ_H2SO4(:ncol,lchnk) = AQ_H2SO4(:ncol,lchnk) + wrk(:ncol)
-         else if ( l_aero == l_so2 ) then 
+         else if ( l_aero == l_so2 ) then
             AQ_SO2(:ncol,lchnk) = AQ_SO2(:ncol,lchnk) + wrk(:ncol)
          endif
 
@@ -671,7 +675,7 @@ contains
 
                if ( l_aero == l_so4_a2 ) then
                   AQ_SO4_A2_OCW(:ncol,lchnk) = AQ_SO4_A2_OCW(:ncol,lchnk) + wrk(:ncol)
-               endif 
+               endif
 
                call outfld( name, wrk(:ncol), ncol, lchnk )
             end if
@@ -778,7 +782,7 @@ contains
       real(r8)         :: numberConcentration(pcols,pver,0:nmodes_oslo)
       real(r8), target :: sad_mode(pcols,pver, nmodes_oslo)
       real(r8)         :: vol_mode(pcols,pver, nmodes_oslo)
-      real(r8)         :: vol(pcols,pver)                  
+      real(r8)         :: vol(pcols,pver)
       real(r8) :: rho_air(pcols,pver)
       integer :: m
       integer :: i,k
@@ -792,7 +796,7 @@ contains
             rho_air(i,k) = pmid(i,k)/(temp(i,k)*rair)
          end do
       end do
-      !    
+      !
       !Get number concentrations in all layers
       call calculateNumberConcentration(ncol, mmr, rho_air, numberConcentration, isChemistry=.true.)
 
@@ -810,13 +814,13 @@ contains
                .or. m .eq. 2 &
                .or. m .eq. 4 &
                .or. m .eq. 5 ) then
-   !               currently only over modes 1,2,4 and 5   
+   !               currently only over modes 1,2,4 and 5
    !               might be extended in the future with modes 12 and 14
                   sad_mode(i,k,m) = numberConcentration(i,k,m)*numberToSurface(m)*1.e-2_r8 !m2/m3 ==> cm2/cm3
 
                   vol_mode(i,k,m) = numberConcentration(i,k,m) &
                                  * 4._r8 / 3._r8 * pi * lifeCycleNumberMedianRadius(m)**3._r8 &
-                                 * dexp(4.5_r8 * log(lifeCycleSigma(m)) *log(lifeCyclesigma(m))) ! m3/m3 = cm3/cm3  
+                                 * dexp(4.5_r8 * log(lifeCycleSigma(m)) *log(lifeCyclesigma(m))) ! m3/m3 = cm3/cm3
                endif
             end do
 

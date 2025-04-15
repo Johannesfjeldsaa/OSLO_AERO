@@ -34,6 +34,10 @@ module mo_neu_wetdep
   logical                     :: debug   = .false.
   integer                     :: hno3_ndx = 0
   integer                     :: h2o2_ndx = 0
+  ! OSLO_AERO begin
+  real(r8), public, protected, allocatable   :: WD_A_SO2_NEU(:,:)
+  integer                                    :: idx_wd_a_h2so4 = -1
+  ! OSLO_AERO end
 !
 ! diagnostics
 !
@@ -57,11 +61,17 @@ subroutine neu_wetdep_init
   use constituents, only : cnst_get_ind,cnst_mw
   use cam_history,  only : addfld, add_default, horiz_only
   use phys_control, only : phys_getopts
+  ! OSLO_AERO begin
+  use ppgrid,       only : pcols, begchunk, endchunk
+  ! OSLO_AERO end
 !
   integer :: m,l
   character*20 :: test_name
 
   logical :: history_chemistry
+  ! OSLO_AERO begin
+  integer :: astat
+  ! OSLO_AERO end
 
   call phys_getopts(history_chemistry_out=history_chemistry)
 
@@ -73,6 +83,15 @@ subroutine neu_wetdep_init
   allocate( mapping_to_mmr(gas_wetdep_cnt) )
   allocate( ice_uptake(gas_wetdep_cnt) )
   allocate( mol_weight(gas_wetdep_cnt) )
+
+  ! OSLO_AERO begin
+  allocate( WD_A_SO2_NEU(pcols, begchunk:endchunk), stat=astat )
+  if( astat/= 0 ) then
+    write(iulog,*) 'neu_wetdep_init: failed to allocate WD_A_SO2 array; error = ',astat
+    call endrun('neu_wetdep_init: failed to allocate WD_A_SO2 array')
+  end if
+  WD_A_SO2_NEU(:,:) = 0.0_r8
+  ! OSLO_AERO end
 
 !
 ! find mapping to heff table
@@ -228,7 +247,9 @@ subroutine neu_wetdep_init
 end subroutine neu_wetdep_init
 !
 subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
-     prain, nevapr, cld, cmfdqr, wd_tend, wd_tend_int)
+     prain, nevapr, cld, cmfdqr, wd_tend, wd_tend_int,              &
+     pbuf                                                           & !OSLO_AERO
+     )
 !
   use ppgrid,           only : pcols, pver
 !!DEK
@@ -236,6 +257,12 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
   use shr_const_mod,    only : SHR_CONST_REARTH,SHR_CONST_G
   use cam_history,      only : outfld
 !
+  ! OSLO_AERO begin
+  use oslo_aero_share,  only : l_so2, l_h2so4
+  use physics_buffer,   only : physics_buffer_desc, pbuf_get_field, pbuf_get_index
+  use constituents,     only : cnst_get_ind
+  use mo_tracname,      only : solsym
+  ! OSLO_AERO end
   implicit none
 !
   integer,        intent(in)    :: lchnk,ncol
@@ -282,8 +309,11 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
   real(r8) :: lats(pcols)
 
   ! OSLO_AERO begin
-  real(r8) :: wrk_wd(pcols)
-  logical history_aerosol
+  real(r8)    :: wrk_wd(pcols)
+  logical     :: history_aerosol
+  integer     :: l_aero
+  type(physics_buffer_desc),  pointer :: pbuf(:)
+  real(r8),                   pointer :: wd_a_h2so4(:)
   ! OSLO_AERO end
 !
 ! from cam/src/physics/cam/stratiform.F90
@@ -300,6 +330,9 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
 ! reset output variables
 !
    wd_tend_int = 0._r8
+   ! OSLO_AERO begin
+   WD_A_SO2_NEU(:ncol,lchnk) = 0._r8
+   ! OSLO_AERO end
 !
 ! get area (in radians square)
 !
@@ -485,17 +518,34 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
 !if neu wetdep, we have to output it here!
    ! OSLO_AERO begin
    call phys_getopts( history_aerosol_out = history_aerosol)
-   if(history_aerosol)then
-      do m=1,gas_wetdep_cnt
-         wrk_wd(:ncol) = 0.0_r8
-         do k=1,pver
-            !Note sign: tendency is negative, so this becomes a positive flux!
-            wrk_wd(:ncol) = wrk_wd(:ncol)  &
-                 - wd_tend(1:ncol,k,mapping_to_mmr(m))*pdel(:ncol,k)*rgrav !kg/m2/sec
-         end do
-         call outfld('WD_A_'//trim(gas_wetdep_list(m)),wrk_wd(:ncol),ncol,lchnk)
+   do m=1,gas_wetdep_cnt
+      wrk_wd(:ncol) = 0.0_r8
+      do k=1,pver
+        !Note sign: tendency is negative, so this becomes a positive flux!
+        wrk_wd(:ncol) = wrk_wd(:ncol)  &
+          - wd_tend(1:ncol,k,mapping_to_mmr(m))*pdel(:ncol,k)*rgrav !kg/m2/sec
       end do
-   end if
+
+      ! get the index of the gas species that coresponds to the l_spcies system
+      call cnst_get_ind(trim(solsym(m)), l_aero, abort=.false.)
+
+      call outfld('WD_A_'//trim(gas_wetdep_list(m)),wrk_wd(:ncol),ncol,lchnk)
+
+      if ( l_aero == l_so2 ) then
+        WD_A_SO2_NEU(:ncol,lchnk) = WD_A_SO2_NEU(:ncol,lchnk) + wrk_wd(:ncol)
+      endif
+
+      ! Save the WD_A field to the wd_a_h2so4 pointer if l_aero == l_h2so4
+      ! this field is passed to the pbuf
+      if (l_aero == l_h2so4) then
+
+        idx_wd_a_h2so4 = pbuf_get_index('WD_A_H2SO4')
+
+        call pbuf_get_field(pbuf, idx_wd_a_h2so4, wd_a_h2so4)
+        wd_a_h2so4(:ncol) = wrk_wd(:ncol)
+      end if
+
+   end do
    ! OSLO_AERO end
 !
   if ( do_diag ) then

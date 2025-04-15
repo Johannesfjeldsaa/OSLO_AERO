@@ -43,10 +43,9 @@ module chemistry
    public :: chem_read_restart
    public :: chem_init_restart
    public :: chem_emissions
-   !OSLO_AERO begin 
+   !OSLO_AERO begin
    public :: summation_fields_init
-   public :: summation_fields_writeout_bc
-   public :: summation_fields_writeout_ac
+   public :: summation_fields_writeout
    !OSLO_AERO end
 
    integer, public :: imozart = -1       ! index of 1st constituent
@@ -54,15 +53,15 @@ module chemistry
    ! OSLO_AERO begin
    ! SF summations used for emission fields summed in summation_fields_writeout()
    ! SFBC = SFBC_A + SFBC_AC + SFBC_AX + SFBC_AI + SFBC_NI + SFBC_N, which implies that we can use the aerosolType()
-   ! SFOM = SFOM_AI + SFOM_AC + SFOM_NI, which implies that we can use the aerosolType() 
+   ! SFOM = SFOM_AI + SFOM_AC + SFOM_NI, which implies that we can use the aerosolType()
    ! SFSULFATE = SFSO4_PR, which implies using l_so4_pr
    ! SFSO2 = SFSO2, which implies that we can use the l_so2 index
    real(r8), public, protected, allocatable :: SF_fields(:,:,:)
-   real(r8), public, protected, allocatable :: SFBC(:,:) 
-   real(r8), public, protected, allocatable :: SFOM(:,:) 
-   real(r8), public, protected, allocatable :: SFSULFATE(:,:) 
-   real(r8), public, protected, allocatable :: SFSO2(:,:) 
-   ! OSLO_AERO end 
+   real(r8), public, protected, allocatable :: SFBC(:,:)
+   real(r8), public, protected, allocatable :: SFOM(:,:)
+   real(r8), public, protected, allocatable :: SFSULFATE(:,:)
+   real(r8), public, protected, allocatable :: SFSO2(:,:)
+   ! OSLO_AERO end
 
    ! Namelist variables
 
@@ -809,7 +808,7 @@ contains
       logical :: history_aerosol
       logical :: history_chemistry
       logical :: history_cesm_forcing
-      !OSLO_AERO begin 
+      !OSLO_AERO begin
       integer :: astat
       !OSLO_AERO end
 
@@ -831,35 +830,35 @@ contains
 
       ! Initialize aerosols
       call aero_model_init( pbuf2d )
-   
+
       !OSLO_AERO begin
       ! allocate the SF summations used for emission fields summed in summation_fields_writeout()
       ! then set them to zero
       allocate( SFBC(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'extfrc_inti: failed to allocate SFBC array; error = ',astat
-         call endrun('extfrc_inti: failed to allocate SFBC array')
+         write(iulog,*) 'chem_init: failed to allocate SFBC array; error = ',astat
+         call endrun('chem_init: failed to allocate SFBC array')
       end if
       SFBC(:,:) = 0.0_r8
       allocate( SFOM(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'extfrc_inti: failed to allocate SFOM array; error = ',astat
-         call endrun('extfrc_inti: failed to allocate SFOM array')
+         write(iulog,*) 'chem_init: failed to allocate SFOM array; error = ',astat
+         call endrun('chem_init: failed to allocate SFOM array')
       end if
       SFOM(:,:) = 0.0_r8
       allocate( SFSULFATE(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'extfrc_inti: failed to allocate SFSULFATE array; error = ',astat
-         call endrun('extfrc_inti: failed to allocate SFSULFATE array')
+         write(iulog,*) 'chem_init: failed to allocate SFSULFATE array; error = ',astat
+         call endrun('chem_init: failed to allocate SFSULFATE array')
       end if
       SFSULFATE(:,:) = 0.0_r8
       allocate( SFSO2(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'extfrc_inti: failed to allocate SFSO2 array; error = ',astat
-         call endrun('extfrc_inti: failed to allocate SFSO2 array')
+         write(iulog,*) 'chem_init: failed to allocate SFSO2 array; error = ',astat
+         call endrun('chem_init: failed to allocate SFSO2 array')
       end if
       SFSO2(:,:) = 0.0_r8
-      !OSLO_AERO end 
+      !OSLO_AERO end
 
    !-----------------------------------------------------------------------
    ! Get liq and ice cloud water indicies
@@ -898,7 +897,7 @@ contains
             else
                unit_basename = 'kg'
             endif
-            
+
             call addfld (sflxnam(n),horiz_only,    'A',  unit_basename//'/m2/s',trim(solsym(m))//' surface flux')
             if ( history_aerosol .or. history_chemistry ) then
                call add_default( sflxnam(n), 1, ' ' )
@@ -913,8 +912,8 @@ contains
                   call addfld('emis_'//trim(sflxnam(n)(3:))//'_S', horiz_only, 'A', 'kg*S/m2/s', &
                      trim(sflxnam(n)(3:))//' emissions, sulfur mass only')
                endif
-               
-               if ( history_aerosol .or. history_aerosol_base ) then 
+
+               if ( history_aerosol .or. history_aerosol_base ) then
                   call add_default( 'emis_'//trim(sflxnam(n)(3:)), 1, ' ' )
                   if ( n == l_dms ) then
                      call add_default( 'emis_'//trim(sflxnam(n)(3:))//'_S', 1, ' ' )
@@ -1113,7 +1112,7 @@ contains
       enddo
 
       ! OSLO_AERO begin
-      ! initialize an array to hold the aerosol emissions for each aerosol type      
+      ! initialize an array to hold the aerosol emissions for each aerosol type
       aero_emis(:,:) = 0.0_r8
       SFBC(:,lchnk) = 0.0_r8
       SFOM(:,lchnk) = 0.0_r8
@@ -1164,21 +1163,21 @@ contains
             endif
 
             ! add salt and dust emissions to the compunded aerosol emissions
-            ! handle summation for the compound SF fields that is used for 
+            ! handle summation for the compound SF fields that is used for
             ! emissions in summation_fields_writeout()
             if ( aerosolType(m) == AEROSOL_TYPE_SALT .or. aerosolType(m) == AEROSOL_TYPE_DUST ) then
                aero_emis(:,aerosolType(m)) = aero_emis(:,aerosolType(m)) + cam_in%cflx(:,m)
-            else if ( aerosolType(m) == AEROSOL_TYPE_BC ) then 
+            else if ( aerosolType(m) == AEROSOL_TYPE_BC ) then
                SFBC(:, lchnk) = SFBC(:, lchnk) + cam_in%cflx(:,m)
-            else if ( aerosolType(m) == AEROSOL_TYPE_OM ) then 
+            else if ( aerosolType(m) == AEROSOL_TYPE_OM ) then
                SFOM(:, lchnk) = SFOM(:, lchnk) + cam_in%cflx(:,m)
-            else if ( m == l_so4_pr ) then 
+            else if ( m == l_so4_pr ) then
                SFSULFATE(:, lchnk) = SFSULFATE(:, lchnk) + cam_in%cflx(:,m)
-            else if ( m == l_so2 ) then 
+            else if ( m == l_so2 ) then
                SFSO2(:, lchnk) = SFSO2(:, lchnk) + cam_in%cflx(:,m)
             endif
             !OSLO_AERO end
-            
+
          endif
       enddo
 
@@ -1505,7 +1504,7 @@ contains
    ! call Neu wet dep scheme
    !-----------------------------------------------------------------------
       call neu_wetdep_tend(lchnk,ncol,state%q,state%pmid,state%pdel,state%zi,state%t,dt, &
-            prain, nevapr, cldfr, cmfdqr, ptend%q, wetdepflx)
+            prain, nevapr, cldfr, cmfdqr, ptend%q, wetdepflx, pbuf)
 
    !-----------------------------------------------------------------------
    ! compute tendencies and surface fluxes
@@ -1534,7 +1533,7 @@ contains
       endif
 
       ! call summation field calculations
-      call summation_fields_writeout_bc( lchnk=state%lchnk, ncol=state%ncol )
+      call summation_fields_writeout( lchnk=state%lchnk, ncol=state%ncol )
 
       call t_stopf( 'chemdr' )
 
@@ -1664,11 +1663,9 @@ contains
       !
       !   SUBROUTINE: summation_fields_init
       !
-      !   DESCRIPTION: Initializes summation field history. 
+      !   DESCRIPTION: Initializes summation field history.
       !                Current fields are:
       !                - DMS: chemical loss
-      !                - isoprene: chemical loss
-      !                - monoterp: chemical loss
       !                - SO2: emission/sulfur emmissions,
       !                    source /sulfur source, sink/sulfur sink
       !                    and chemical loss
@@ -1685,10 +1682,14 @@ contains
       use cam_history,        only  : addfld, add_default, horiz_only
       use phys_control,       only  : history_aerosol_base, history_gas
 
-      
       ! -----------------------------------------------------------------------
       ! Initialisation of fields, orderered as in DESCRIPTION
       ! -----------------------------------------------------------------------
+      ! DMS
+      call addfld ('chloss_DMS_S', horiz_only, 'A',  'kg*S/m2/s',   &
+         'Chemical loss of DMS, sulfur mass only.')
+      call addfld ('chlossg_DMS_S', horiz_only, 'A',  'kg*S/m2/s',   &
+         'Chemical loss of DMS as gas, sulfur mass only.')
       ! SO2
       call addfld ('emis_SO2', horiz_only, 'A',  'kg/m2/s',   &
          'SO2 emission.')
@@ -1696,8 +1697,16 @@ contains
          'SO2 emission, sulfur mass only.')
       call addfld ('sour_SO2_S', horiz_only, 'A',  'kg*S/m2/s',   &
          'SO2 source, sulfur mass only.')
+      call addfld ('wet_SO2', horiz_only, 'A',  'kg/m2/s',   &
+         'SO2 wet deposition flux at surface.')
+      call addfld ('wet_SO2_S', horiz_only, 'A',  'kg*S/m2/s',   &
+         'SO2 wet deposition flux at surface, sulfur mass only.')
       call addfld ('sink_SO2_S', horiz_only, 'A',  'kg*S/m2/s',   &
          'SO2 sink, sulfur mass only.')
+      call addfld ('chloss_SO2_S', horiz_only, 'A',  'kg*S/m2/s',   &
+         'Chemical loss of SO2, sulfur mass only.')
+      call addfld ('chlossg_SO2_S', horiz_only, 'A',  'kg*S/m2/s',   &
+         'Chemical loss of SO2 as gas, sulfur mass only.')
       ! SULFATE
       call addfld ('emis_SULFATE', horiz_only, 'A',  'kg/m2/s',   &
          'SULFATE emission.')
@@ -1707,10 +1716,6 @@ contains
          'SULFATE source.')
       call addfld ('sour_SULFATE_S', horiz_only, 'A',  'kg*S/m2/s',   &
          'SULFATE source, sulfur mass only.')
-      call addfld ('wet_SULFATE', horiz_only, 'A',  'kg/m2/s',   &
-         'SULFATE wet deposition.')
-      call addfld ('wet_SULFATE_S', horiz_only, 'A',  'kg*S/m2/s',   &
-         'SULFATE wet deposition, sulfur mass only.')
       ! BC
       call addfld ('emis_BC', horiz_only, 'A',  'kg/m2/s',   &
          'BC emission.')
@@ -1719,71 +1724,90 @@ contains
          'OM emission.')
       call addfld ('sour_OM', horiz_only, 'A',  'kg/m2/s',   &
          'OM source.')
-      
-      if ( history_aerosol_base ) then 
+
+      ! TEMPORARY FIELDS
+      call addfld ('tot_dms_lost_as_S', horiz_only, 'A',  'kg/m2/s',   &
+         'tmp field, REMOVE BFR PR.')
+      call add_default('tot_dms_lost_as_S', 1, ' ')
+      call addfld ('msa_prod_from_dms_as_S', horiz_only, 'A',  'kg/m2/s',   &
+      'tmp field, REMOVE BFR PR.')
+      call add_default('msa_prod_from_dms_as_S', 1, ' ')
+      call addfld ('SO2_formed_from_DMS_as_S', horiz_only, 'A',  'kg/m2/s',   &
+         'tmp field, REMOVE BFR PR.')
+      call add_default('SO2_formed_from_DMS_as_S', 1, ' ')
+
+      if ( history_aerosol_base ) then
          ! SO2
          call add_default( 'emis_SO2', 1, ' ' )
          call add_default( 'emis_SO2_S', 1, ' ' )
          call add_default( 'sour_SO2_S', 1, ' ' )
+         call add_default( 'wet_SO2', 1, ' ' )
+         call add_default( 'wet_SO2_S', 1, ' ' )
          call add_default( 'sink_SO2_S', 1, ' ' )
          ! SULFATE
          call add_default( 'emis_SULFATE', 1, ' ' )
          call add_default( 'emis_SULFATE_S', 1, ' ' )
          call add_default( 'sour_SULFATE', 1, ' ' )
          call add_default( 'sour_SULFATE_S', 1, ' ' )
-         call add_default( 'wet_SULFATE', 1, ' ' )
-         call add_default( 'wet_SULFATE_S', 1, ' ' )
          ! BC
          call add_default( 'emis_BC', 1, ' ' )
          ! OM
          call add_default( 'emis_OM', 1, ' ' )
          call add_default( 'sour_OM', 1, ' ' )
-         
+
       endif
 
-      
+      if ( history_gas ) then
+         ! DMS
+         call add_default( 'chloss_DMS_S', 1, ' ' )
+         call add_default( 'chlossg_DMS_S', 1, ' ' )
+         ! SO2
+         call add_default( 'chloss_SO2_S', 1, ' ' )
+         call add_default( 'chlossg_SO2_S', 1, ' ' )
+
+      endif
 
    end subroutine summation_fields_init
 
 !-------------------------------------------------------------------
 !-------------------------------------------------------------------
 
-   subroutine summation_fields_writeout_bc(lchnk, ncol)
+   subroutine summation_fields_writeout(lchnk, ncol)
       ! =======================================================================
       !
-      !   SUBROUTINE: summation_fields_writeout_bc
+      !   SUBROUTINE: summation_fields_writeout
       !
       !   DESCRIPTION: calculates and writes out summation fields for fields
       !                that are a sum of fields from different modules.
       !                Implemented fields are:
       !                - DMS: chemical loss
-      !                - isoprene: chemical loss
-      !                - monoterp: chemical loss
       !                - SO2: emission/sulfur emmissions,
-      !                    source /sulfur source, sink/sulfur sink
+      !                    source /sulfur source,
+      !                    wet deposition/sulfur wet deposition,
+      !                    sink/sulfur sink
       !                    and chemical loss
-      !                - SULFATE: emission/sulfur emmissions, 
+      !                - SULFATE: emission/sulfur emmissions,
       !                    source /sulfur source, *
-      !                    
+      !
       !                - BC: emission
       !                - OM: emission and source
-      !                The outfld calls are performed at the end since some 
+      !                The outfld calls are performed at the end since some
       !                of the arrays are part of multiple output fields.
       !
       !                * wet deposition of SULFATE is a summation field
       !                * but is not written out here. It is written out in
       !                * summation_fields_writeout_ac() (after coupling
-      !                * because it uses SFWET fields which are not 
+      !                * because it uses SFWET fields which are not
       !                * available before coupling (bc)).
-      !                
+      !
       !   ARGUMENTS:
       !     integer, intent(in)  :: lchnk
-      !         LCHNK DESCRIPTION! 
+      !         LCHNK DESCRIPTION!
       !     integer, intent(in)  :: ncol
       !         NCOL DESCRIPTION!
       !
       ! =======================================================================
-      
+
       ! -----------------------------------------------------------------------
       ! import variables
       ! -----------------------------------------------------------------------
@@ -1798,31 +1822,42 @@ contains
                                       l_so4_pr, &
                                       l_h2so4,  &
                                       l_bc_ax,  &
-                                      l_bc_n,   & 
+                                      l_bc_n,   &
                                       l_bc_ni,  &
                                       l_om_ni,  &
                                       l_dms
       use mo_extfrc,          only  : CMXF_fields  ! for SO2, SULFATE, BC and OM emissions and sources
       use aero_model,         only  : GS_SOA,                           & ! for OM source
                                       GS_H2SO4, AQ_H2SO4, AQ_SO4_A2_OCW,& ! for SULFATE source
-                                      GS_SO2, AQ_SO2,                   & ! for SO2 sink 
+                                      GS_SO2, AQ_SO2,                   & ! for SO2 sink
                                       GS_DMS, GS_isoprene, GS_monoterp    ! for SO2_formed_from_DMS_as_S
       use mo_chm_diags,       only  : DF_SO2,                           & ! for SO2 sink
-                                      WD_A_SO2                            ! for SO2 sink
+                                      WD_A_SO2                            ! for SO2 sink if gas_wetdep_method == MOZ
+      use mo_neu_wetdep,      only  : WD_A_SO2_NEU                        ! for SO2 sink if gas_wetdep_method == NEU
+      use gas_wetdep_opts,    only  : gas_wetdep_method
+
       ! -----------------------------------------------------------------------
       ! Arguments summation_fields_writeout
       ! -----------------------------------------------------------------------
-      integer,   intent(in)         :: lchnk 
+      integer,   intent(in)         :: lchnk
       integer,   intent(in)         :: ncol
 
       ! -----------------------------------------------------------------------
       ! Local variables summation_fields_writeout
       ! -----------------------------------------------------------------------
+      real(r8)                      :: tot_dms_lost_as_S(pcols)
+      real(r8)                      :: msa_prod_from_dms_as_S(pcols)
       real(r8)                      :: SO2_formed_from_DMS_as_S(pcols)
+      real(r8)                      :: chloss_DMS_S(pcols)
+      real(r8)                      :: chlossg_DMS_S(pcols)
       real(r8)                      :: emis_SO2(pcols)
       real(r8)                      :: emis_SO2_S(pcols)
       real(r8)                      :: sour_SO2_S(pcols)
+      real(r8)                      :: wet_SO2(pcols)
+      real(r8)                      :: wet_SO2_S(pcols)
       real(r8)                      :: sink_SO2_S(pcols)
+      real(r8)                      :: chloss_SO2_S(pcols)
+      real(r8)                      :: chlossg_SO2_S(pcols)
       real(r8)                      :: emis_SULFATE(pcols)
       real(r8)                      :: emis_SULFATE_S(pcols)
       real(r8)                      :: sour_SULFATE(pcols)
@@ -1830,54 +1865,36 @@ contains
       real(r8)                      :: emis_BC(pcols)
       real(r8)                      :: emis_OM(pcols)
       real(r8)                      :: sour_OM(pcols)
+      real(r8)                      :: WD_A_SO2_local_(pcols)
 
+      ! set local version of variables
+      if ( gas_wetdep_method == 'MOZ' ) then
+         WD_A_SO2_local_(:ncol) = WD_A_SO2(:ncol, lchnk)
+      else if ( gas_wetdep_method == 'NEU' ) then
+         WD_A_SO2_local_(:ncol) = WD_A_SO2_NEU(:ncol, lchnk)
+      endif
 
       ! Zero all local variables
+      tot_dms_lost_as_S(:) = 0._r8
+      msa_prod_from_dms_as_S(:) = 0._r8
       SO2_formed_from_DMS_as_S(:) = 0._r8
+      chloss_DMS_S(:) = 0._r8
+      chlossg_DMS_S(:) = 0._r8
       emis_SO2(:) = 0._r8
       emis_SO2_S(:) = 0._r8
       sour_SO2_S(:) = 0._r8
+      wet_SO2(:) = 0._r8
+      wet_SO2_S(:) = 0._r8
       sink_SO2_S(:) = 0._r8
+      chloss_SO2_S(:) = 0._r8
+      chlossg_SO2_S(:) = 0._r8
       emis_SULFATE(:) = 0._r8
       emis_SULFATE_S(:) = 0._r8
       emis_BC(:) = 0._r8
       emis_OM(:) = 0._r8
       sour_OM(:) = 0._r8
 
-      ! -----------------------------------------------------------------------
-      ! DMS summation fields
-      !     chloss_DMS *
-      !     chlossg_DMS *
-      !     * not implemented yet
-      ! -----------------------------------------------------------------------
-
-      ! -----------------------------------------------------------------------
-      ! isoprene summation fields
-      !    chloss_isoprene *
-      !    chlossg_isoprene *
-      !     * not implemented yet
-      ! -----------------------------------------------------------------------
-
-      ! -----------------------------------------------------------------------
-      ! monoterp summation fields
-      !    chloss_monoterp *
-      !    chlossg_monoterp *
-      !     * not implemented yet
-      ! -----------------------------------------------------------------------
-
-      ! -----------------------------------------------------------------------
-      ! SO2 summation fields
-      !     emis_SO2
-      !     emis_SO2_S
-      !     sour_SO2 *
-      !     sour_SO2_S
-      !     sink_SO2 *
-      !     sink_SO2_S
-      !     chloss_SO2 *
-      !     chlossg_SO2 *
-      !     * not implemented yet
-      ! -----------------------------------------------------------------------
-      
+      ! calculate summations that is used across tracer species
       ! SO2_formed_from_DMS_as_S = tot_dms_lost_as_S - msa_prod_from_dms_as_S
       !     tot_dms_lost_as_S = - GS_DMS * sulfurMassFraction(l_dms)
       !     msa_prod_from_dms_as_S = sulfurMassFraction_MSA * (
@@ -1886,26 +1903,58 @@ contains
       !         NOTE: The 0.005 and 0.15 are tuning factors - i.e. "magic numbers". Per 2024-04.08 these are in sync with the
       !         chem_mech document (NorESM/components/cam/src/chemistry/pp_trop_mam_oslo/chem_mech.doc) line 109-111
       !         (monoterp = 0.15) and line 112-114 (isoprene = 0.005).
-      SO2_formed_from_DMS_as_S(:ncol) = ( - GS_DMS(:ncol,lchnk) * sulfurMassFraction(l_dms) )    - & 
-         (                                                                                        &
-            sulfurMassFraction_MSA * ( GS_SOA(:ncol,lchnk)                                      - &
-                                       (-1.0*(0.005*SOAyield_isoprene*GS_isoprene(:ncol,lchnk) +  &
-                                              0.15*SOAyield_monoterp*GS_monoterp(:ncol,lchnk) ) ) &
-                                     )                                                            &
-         ) 
+      tot_dms_lost_as_S(:ncol) = - GS_DMS(:ncol,lchnk) * sulfurMassFraction(l_dms)
+      msa_prod_from_dms_as_S(:ncol) = sulfurMassFraction_MSA * (                          &
+         GS_SOA(:ncol, lchnk) -                                                           &
+         (-1.0_r8 * ( 0.005_r8*SOAyield_isoprene*GS_isoprene(:ncol, lchnk) +              &
+                      0.15_r8*SOAyield_monoterp*GS_monoterp(:ncol, lchnk) ) )             &
+      )
+
+      SO2_formed_from_DMS_as_S(:ncol) = tot_dms_lost_as_S(:ncol) - msa_prod_from_dms_as_S(:ncol)
+
+      ! -----------------------------------------------------------------------
+      ! DMS summation fields
+      !     chloss_DMS
+      !     chlossg_DMS
+      ! -----------------------------------------------------------------------
+      chloss_DMS_S(:ncol) = -1.0_r8 * tot_dms_lost_as_S(:ncol)
+      chlossg_DMS_S(:ncol) = -1.0_r8 * msa_prod_from_dms_as_S(:ncol)
+
+      ! -----------------------------------------------------------------------
+      ! SO2 summation fields
+      !     emis_SO2
+      !     emis_SO2_S
+      !     sour_SO2 *
+      !     sour_SO2_S
+      !     wet_SO2
+      !     wet_SO2_S
+      !     sink_SO2 *
+      !     sink_SO2_S
+      !     chloss_SO2
+      !     chlossg_SO2
+      !     * not implemented yet
+      ! -----------------------------------------------------------------------
+
       ! emis_SO2
       emis_SO2(:ncol) = SFSO2(:ncol, lchnk) + CMXF_fields(:ncol, l_so2, lchnk)
       emis_SO2_S(:ncol) = ( SFSO2(:ncol, lchnk) + CMXF_fields(:ncol, l_so2, lchnk) ) * sulfurMassFraction(l_so2)
       ! sour_SO2
       sour_SO2_S(:ncol) = emis_SO2_S(:ncol) + SO2_formed_from_DMS_as_S(:ncol)
+      ! wet deposition SO2
+      wet_SO2(:ncol) = WD_A_SO2_local_(:ncol)
+      wet_SO2_S(:ncol) = WD_A_SO2_local_(:ncol) * sulfurMassFraction(l_so2)
       ! sink SO2
-      sink_SO2_S(:ncol) = ( ( WD_A_SO2(:ncol, lchnk)           + & 
-           DF_SO2(:ncol, lchnk)                                + & 
-           AQ_SO2(:ncol, lchnk)                                + & 
-           GS_SO2(:ncol, lchnk)                                - & 
+      sink_SO2_S(:ncol) = ( ( WD_A_SO2_local_(:ncol)           + &
+           DF_SO2(:ncol, lchnk)                                + &
+           AQ_SO2(:ncol, lchnk)                                + &
+           GS_SO2(:ncol, lchnk)                                - &
            CMXF_fields(:ncol, l_so2, lchnk)                      &
-         ) / sulfurMassFraction(l_so2)                           &
+         ) * sulfurMassFraction(l_so2)                           &
       ) - SO2_formed_from_DMS_as_S(:ncol)
+      ! chemical loss SO2
+      chlossg_SO2_S(:ncol) = (GS_SO2(:ncol, lchnk) - CMXF_fields(:ncol, l_so2, lchnk)) * sulfurMassFraction(l_so2)    - &
+         SO2_formed_from_DMS_as_S(:ncol)
+      chloss_SO2_S(:ncol) = chlossg_SO2_S(:ncol) + ( AQ_SO2(:ncol, lchnk) * sulfurMassFraction(l_so2) )
 
       ! -----------------------------------------------------------------------
       ! SULFATE summation fields
@@ -1914,14 +1963,14 @@ contains
       !     sour_SULFATE
       !     sour_SULFATE_S
       ! -----------------------------------------------------------------------
-  
+
       ! emis_SULFATE
       emis_SULFATE(:ncol) = SFSULFATE(:ncol, lchnk) + CMXF_fields(:ncol,l_so4_pr,lchnk)
       ! emis_SULFATE_S, sulfur mass only
       emis_SULFATE_S(:ncol) = ( SFSULFATE(:ncol, lchnk) + CMXF_fields(:ncol,l_so4_pr,lchnk) ) * sulfurMassFraction(l_so4_pr)
       ! sour_SULFATE
       sour_SULFATE(:ncol) = emis_SULFATE(:ncol)             + &
-                              GS_H2SO4(:ncol, lchnk)        + & 
+                              GS_H2SO4(:ncol, lchnk)        + &
                               AQ_H2SO4(:ncol, lchnk)        + &
                               AQ_SO4_A2_OCW(:ncol, lchnk)
       ! sour_SULFATE_S, sulfur mass only
@@ -1953,11 +2002,18 @@ contains
       ! -----------------------------------------------------------------------
       ! outfld calls
       ! -----------------------------------------------------------------------
+      ! DMS outfld calls
+      call outfld('chloss_DMS_S', chloss_DMS_S(:), ncol, lchnk)
+      call outfld('chlossg_DMS_S', chlossg_DMS_S(:), ncol, lchnk)
       ! SO2 outfld calls
       call outfld('emis_SO2', emis_SO2(:), ncol, lchnk)
       call outfld('emis_SO2_S', emis_SO2_S(:), ncol, lchnk)
       call outfld('sour_SO2_S', sour_SO2_S(:), ncol, lchnk)
+      call outfld('wet_SO2', wet_SO2(:), ncol, lchnk)
+      call outfld('wet_SO2_S', wet_SO2_S(:), ncol, lchnk)
       call outfld('sink_SO2_S', sink_SO2_S(:), ncol, lchnk)
+      call outfld('chloss_SO2_S', chloss_SO2_S(:), ncol, lchnk)
+      call outfld('chlossg_SO2_S', chlossg_SO2_S(:), ncol, lchnk)
       ! SULFATE outfld calls
       call outfld('emis_SULFATE', emis_SULFATE(:), ncol, lchnk)
       call outfld('emis_SULFATE_S', emis_SULFATE_S(:), ncol, lchnk)
@@ -1968,75 +2024,11 @@ contains
       ! OM outfld calls
       call outfld('emis_OM', emis_OM(:), ncol, lchnk)
       call outfld('sour_OM', sour_OM(:), ncol, lchnk)
+      ! tmp field outfld
+      call outfld('tot_dms_lost_as_S', tot_dms_lost_as_S(:), ncol, lchnk)
+      call outfld('msa_prod_from_dms_as_S', msa_prod_from_dms_as_S(:), ncol, lchnk)
+      call outfld('SO2_formed_from_DMS_as_S', SO2_formed_from_DMS_as_S(:), ncol, lchnk)
 
-  end subroutine summation_fields_writeout_bc
+  end subroutine summation_fields_writeout
 
-  subroutine summation_fields_writeout_ac(lchnk, ncol)
-      ! =======================================================================
-      !
-      !   SUBROUTINE: summation_fields_writeout_ac
-      !
-      !   DESCRIPTION: calculates and writes out summation fields for fields
-      !                that are a sum of fields from different modules.
-      !                Implemented fields are:
-      !                - SULFATE: wet deposition/sulfur wet deposition
-      !                
-      !                See summation_fields_writeout_bc() for other fields.
-      !                
-      !   ARGUMENTS:
-      !     integer, intent(in)  :: lchnk
-      !         LCHNK DESCRIPTION! 
-      !     integer, intent(in)  :: ncol
-      !         NCOL DESCRIPTION!
-      !
-      ! =======================================================================
-      
-      ! -----------------------------------------------------------------------
-      ! import variables
-      ! -----------------------------------------------------------------------
-      use ppgrid,             only  : pcols, begchunk, endchunk
-      use cam_history,        only  : outfld
-      use oslo_aero_share,    only  : sulfurMassFraction ! for sulfur mass versions of numbers
-      use oslo_aero_share,    only  : l_so4_a1, &         
-                                      l_so4_a2, &
-                                      l_so4_ac, &
-                                      l_so4_na, &
-                                      l_so4_pr, &
-                                      l_h2so4
-      use mo_chm_diags,       only  : WD_A_H2SO4 ! for SULFATE wet deposition
-
-      ! -----------------------------------------------------------------------
-      ! Arguments summation_fields_writeout
-      ! -----------------------------------------------------------------------
-      integer,   intent(in)         :: lchnk 
-      integer,   intent(in)         :: ncol
-
-      ! -----------------------------------------------------------------------
-      ! Local variables summation_fields_writeout
-      ! -----------------------------------------------------------------------
-      real(r8)                      :: wet_SULFATE(pcols)
-      real(r8)                      :: wet_SULFATE_S(pcols)
-
-
-      ! Zero all local variables
-      wet_SULFATE(:) = 0._r8
-      wet_SULFATE_S(:) = 0._r8
-      
-      ! -----------------------------------------------------------------------
-      ! SULFATE summation fields
-      !     wet_SULFATE
-      !     wet_SULFATE_S
-      ! -----------------------------------------------------------------------
-      ! wet_SULFATE
-      wet_SULFATE(:ncol) = WD_A_H2SO4(:ncol, lchnk) 
-      wet_SULFATE_S(:ncol) = ( WD_A_H2SO4(:ncol, lchnk) * sulfurMassFraction(l_h2so4) )
-      
-      ! -----------------------------------------------------------------------
-      ! outfld calls
-      ! -----------------------------------------------------------------------
-      ! SULFATE outfld calls
-      call outfld('wet_SULFATE', wet_SULFATE(:), ncol, lchnk)
-      call outfld('wet_SULFATE_S', wet_SULFATE_S(:), ncol, lchnk)
- 
-  end subroutine summation_fields_writeout_ac
 end module chemistry

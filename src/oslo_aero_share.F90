@@ -21,8 +21,8 @@ module oslo_aero_share
    !---------------------------
 
    public :: aero_register           ! register consituents
-   public :: sulfur_mass_fraction_register 
-   public :: soa_mass_fraction_register
+   public :: sulfur_mass_fraction_register
+   public :: soa_yield_register
    public :: is_process_mode         ! Check is an aerosol specie is a process mode
    public :: isAerosol               ! Check is specie is aerosol (i.e. gases get .FALSE. here)
    public :: getTracerIndex
@@ -239,7 +239,7 @@ module oslo_aero_share
    real(r8) :: osmoticCoefficient(pcnst)
    real(r8) :: numberOfIons(pcnst)
    real(r8) :: solubleMassFraction(pcnst)
-   real(r8) :: sulfurMassFraction(pcnst)   
+   real(r8) :: sulfurMassFraction(pcnst)
    real(r8) :: sulfurMassFraction_MSA
    real(r8) :: SOAyield_isoprene
    real(r8) :: SOAyield_monoterp
@@ -336,7 +336,6 @@ contains
       ! instead of hard-coding it.
       !-----------------------------------------------------------------------
 
-      use mpishorthand
       use physics_buffer,  only: pbuf_add_field, dtype_r8
       use ppgrid,          only: pcols, pver, pverp
 
@@ -491,11 +490,11 @@ contains
 
    subroutine sulfur_mass_fraction_register
       !-----------------------------------------------------------------------
-      ! Register the sulfur mass fraction for the different tracers 
+      ! Register the sulfur mass fraction for the different tracers
       ! where sulfur is present. Both for the aerosol tracers and the
       ! gas phase tracers.
       !-----------------------------------------------------------------------
-      
+
       sulfurMassFraction(:) = 0.0_r8
       ! for dms the sulfur mass fraction is assumed ~32/62=M_S/M_DMS since DMS is CH3SCH3
       sulfurMassFraction(l_dms) = 32.0_r8/62.0_r8
@@ -522,18 +521,18 @@ contains
 
    !===============================================================================
 
-   subroutine soa_mass_fraction_register
+   subroutine soa_yield_register
       !-----------------------------------------------------------------------
-      ! Register the SOA yield for the different tracers which 
-      ! can produce SOA.  
+      ! Register the SOA yield for the different tracers which
+      ! can produce SOA.
       !-----------------------------------------------------------------------
-      
+
       ! for isoprene the SOA mass fraction is assumed ~168/136 since ...
       SOAyield_isoprene = 168.0_r8/68.0_r8
       ! for monoterpenes the SOA mass fraction is assumed ~168/136 since ...
       SOAyield_monoterp = 168.0_r8/136.0_r8
 
-   end subroutine soa_mass_fraction_register
+   end subroutine soa_yield_register
 
    !=============================================================================
    function getNumberOfAerosolTracers()RESULT(numberOfTracers)
