@@ -528,11 +528,12 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
       end do
 
       ! get the index of the gas species that coresponds to the l_spcies system
-      call cnst_get_ind(trim(solsym(m)), l_aero, abort=.false.)
+      call cnst_get_ind(trim(gas_wetdep_list(m)), l_aero, abort=.false.)
 
       call outfld('WD_A_'//trim(gas_wetdep_list(m)),wrk_wd(:ncol),ncol,lchnk)
 
       if ( l_aero == l_so2 ) then
+
         call outfld('wet_SO2', wrk_wd(:ncol), ncol, lchnk)
         call outfld('wet_SO2_S', ( wrk_wd(:ncol) * sulfurMassFraction(l_so2) ), ncol, lchnk)
 
