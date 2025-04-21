@@ -93,6 +93,9 @@ contains
 !=============================================================================
 
   subroutine aero_model_readnl(nlfilename)
+    ! OSLO_AERO begin
+    use oslo_aero_dust,   only: oslo_aero_dust_readnl
+    ! OSLO_AERO end
 
     ! read aerosol namelist options
 
@@ -126,6 +129,9 @@ contains
 
     call oslo_aero_ctl_readnl(nlfilename)
     call oslo_aero_microp_readnl(nlfilename)
+   ! OSLO_AERO begin
+   call oslo_aero_dust_readnl(nlfilename)
+   ! OSLO_AERO end
 
   end subroutine aero_model_readnl
 
@@ -138,6 +144,7 @@ contains
 
   !=============================================================================
   subroutine aero_model_init( pbuf2d )
+     use mo_setsox, only: sox_inti
 
     ! args
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
@@ -150,6 +157,9 @@ contains
     !------------------------------------
 
     call phys_getopts(history_aerosol_out=history_aerosol, convproc_do_aer_out=convproc_do_aer)
+
+    ! aqueous chem initialization
+    call sox_inti()
 
     call aero_model_constants
     call init_interp_constants() ! table initialization constants
@@ -277,7 +287,7 @@ contains
          oslo_dgnumwet, oslo_wetdens, oslo_dgnumwet_processmodes, oslo_wetdens_processmodes, &
          cam_out, ptend)
 
-  endsubroutine aero_model_drydep
+  end subroutine aero_model_drydep
 
   !=============================================================================
   subroutine aero_model_wetdep( state, dt, dlf, cam_out, ptend, pbuf)
@@ -292,11 +302,12 @@ contains
     call oslo_aero_depos_wet(state%lchnk, state%ncol, state%psetcols, state%pmid, state%pdel, state%q, state%t, &
          dt, dlf, cam_out, ptend, pbuf)
 
-  endsubroutine aero_model_wetdep
+  end subroutine aero_model_wetdep
 
-  !=============================================================================
-  subroutine aero_model_surfarea(mmr, radmean, relhum, pmid, temp, strato_sad, sulfate, rho, ltrop, &
-       dlat, het1_ndx, pbuf, ncol, sfc, dm_aer, sad_trop, reff_trop )
+  !============================================================================
+  subroutine aero_model_surfarea(state, mmr, radmean, relhum, pmid, temp, &
+       strato_sad, sulfate, rho, ltrop, dlat, het1_ndx, pbuf, ncol, sfc, &
+       dm_aer, sad_trop, reff_trop )
 
     !-------------------------------------------------------------------------
     ! provides wet tropospheric aerosol surface area info for modal aerosols
@@ -304,6 +315,7 @@ contains
     !-------------------------------------------------------------------------
 
     ! arguments
+    type(physics_state), intent(in) :: state        ! Physics state variables
     real(r8), intent(in)    :: pmid(:,:)
     real(r8), intent(in)    :: temp(:,:)
     real(r8), intent(in)    :: mmr(:,:,:)
@@ -362,7 +374,8 @@ contains
   end subroutine aero_model_surfarea
 
   !=============================================================================
-  subroutine aero_model_strat_surfarea( ncol, mmr, pmid, temp, ltrop, pbuf, strato_sad, reff_strat )
+  subroutine aero_model_strat_surfarea( state, ncol, mmr, pmid, temp, &
+       ltrop, pbuf, strato_sad, reff_strat )
 
     !-------------------------------------------------------------------------
     ! provides WET stratospheric aerosol surface area info for modal aerosols
@@ -370,6 +383,7 @@ contains
     !-------------------------------------------------------------------------
 
     ! arguments
+    type(physics_state), intent(in) :: state        ! Physics state variables
     integer,  intent(in)    :: ncol
     real(r8), intent(in)    :: mmr(:,:,:)
     real(r8), intent(in)    :: pmid(:,:)
@@ -384,14 +398,13 @@ contains
 
   end subroutine aero_model_strat_surfarea
 
-  !=============================================================================
-  subroutine aero_model_gasaerexch( loffset, ncol, lchnk, troplev, delt, reaction_rates, &
-       tfld, pmid, pdel, mbar, relhum, &
-       zm,  qh2o, cwat, cldfr, cldnum, &
-       airdens, invariants, del_h2so4_gasprod,  &
-       vmr0, vmr, pbuf )
+  !===========================================================================
+  subroutine aero_model_gasaerexch( state, loffset, ncol, lchnk, troplev,     &
+       delt, reaction_rates, tfld, pmid, pdel, mbar, relhum, zm,  qh2o, cwat, &
+       cldfr, cldnum, airdens, invariants, del_h2so4_gasprod, vmr0, vmr, pbuf )
 
     ! arguments
+    type(physics_state), intent(in) :: state        ! Physics state variables
     integer,  intent(in)    :: loffset                ! offset applied to modal aero "pointers"
     integer,  intent(in)    :: ncol                   ! number columns in chunk
     integer,  intent(in)    :: lchnk                  ! chunk index
@@ -487,7 +500,7 @@ contains
     dvmrcwdt_sv1 = vmrcw
 
     ! aqueous chemistry ...
-    call setsox( ncol, lchnk, loffset, delt, pmid, pdel, tfld, mbar, cwat, &
+    call setsox( state, ncol, lchnk, loffset, delt, pmid, pdel, tfld, mbar, cwat, &
          cldfr, cldnum, airdens, invariants, vmrcw, vmr, xphlwc, &
          aqso4, aqh2so4, aqso4_h2o2, aqso4_o3)
 

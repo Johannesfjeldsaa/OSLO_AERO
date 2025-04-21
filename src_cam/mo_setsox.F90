@@ -1,14 +1,15 @@
-
-module MO_SETSOX
+module mo_setsox
 
   use shr_kind_mod, only : r8 => shr_kind_r8
   use cam_logfile,  only : iulog
+  use physics_types,only : physics_state
+
+  implicit none
 
   private
   public :: sox_inti, setsox
   public :: has_sox
 
-  save
   logical            ::  inv_o3
   integer            ::  id_msa
 
@@ -19,29 +20,31 @@ module MO_SETSOX
   logical :: inv_so2, inv_nh3, inv_hno3, inv_h2o2, inv_ox, inv_nh4no3, inv_ho2
 
   logical :: cloud_borne = .false.
-  logical :: modal_aerosols = .false.
 
 contains
 
 !-----------------------------------------------------------------------
 !-----------------------------------------------------------------------
-  subroutine sox_inti
+  subroutine sox_inti()
     !-----------------------------------------------------------------------
     !	... initialize the hetero sox routine
     !-----------------------------------------------------------------------
 
-    use mo_chem_utls, only : get_spc_ndx, get_inv_ndx
-    use spmd_utils,   only : masterproc
-    use phys_control, only : phys_getopts
+    use mo_chem_utls,          only : get_spc_ndx, get_inv_ndx
+    use spmd_utils,            only : masterproc
+    use phys_control,          only : phys_getopts
+    use carma_flags_mod,       only : carma_do_cloudborne
     ! OSLO_AERO begin
     use oslo_aero_sox_cldaero, only : sox_cldaero_init
     ! OSLO_AERO_END
-    implicit none
+
+    logical :: modal_aerosols
 
     ! OSLO_AERO begin
     modal_aerosols = .true.
-    cloud_borne = .true.
     ! OSLO_AERO end
+
+    cloud_borne = modal_aerosols .or. carma_do_cloudborne
 
     !-----------------------------------------------------------------
     !       ... get species indicies
@@ -116,10 +119,15 @@ contains
     if( has_sox ) then
        if (masterproc) then
           write(iulog,*) '-----------------------------------------'
-          write(iulog,*) 'mozart will do sox aerosols'
+          write(iulog,*) 'mo_setsox will do sox aerosols'
           write(iulog,*) '-----------------------------------------'
        endif
     else
+       if (masterproc) then
+          write(iulog,*) '-----------------------------------------'
+          write(iulog,*) ' mo_setsox will not do sox aerosols'
+          write(iulog,*) '-----------------------------------------'
+       endif
        return
     end if
 
@@ -129,7 +137,7 @@ contains
 
 !-----------------------------------------------------------------------
 !-----------------------------------------------------------------------
-  subroutine SETSOX( &
+  subroutine setsox( state, &
        ncol,   &
        lchnk,  &
        loffset,&
@@ -180,11 +188,10 @@ contains
     use oslo_aero_sox_cldaero, only : cldaero_conc_t
     ! OSLO_AERO end
     !
-    implicit none
-    !
     !-----------------------------------------------------------------------
     !      ... Dummy arguments
     !-----------------------------------------------------------------------
+    type(physics_state), intent(in) :: state             ! Physics state variables
     integer,          intent(in)    :: ncol              ! num of columns in chunk
     integer,          intent(in)    :: lchnk             ! chunk id
     integer,          intent(in)    :: loffset           ! offset of chem tracers in the advected tracers array
@@ -616,7 +623,7 @@ contains
              end do ! iter
 
              if( .not. converged ) then
-                write(iulog,*) 'SETSOX: pH failed to converge @ (',i,',',k,'), % change=', &
+                write(iulog,*) 'setsox: pH failed to converge @ (',i,',',k,'), % change=', &
                      100._r8*delta
              end if
           else
@@ -693,7 +700,7 @@ contains
                   / xam                   ! /cm3(a)/s    / air-den     = mix-ratio/s
           endif
 
-          if ( .not. modal_aerosols ) then
+          if ( .not. cloud_borne) then    ! this seems to be specific to aerosols that are not cloud borne
              xh2o2(i,k) = xh2o2(i,k) + r2h2o2*dtime         ! updated h2o2 by het production
           endif
 
@@ -778,7 +785,7 @@ contains
                 patm_x = 1._r8
              endif
 
-             if (modal_aerosols) then
+             if (cloud_borne) then
 
                 pso4 = rah2o2 * 7.4e4_r8*EXP(6621._r8*work1(i)) * h2o2g * patm_x &
                      * 1.23_r8 *EXP(3120._r8*work1(i)) * so2g * patm_x
@@ -827,7 +834,7 @@ contains
                 end if
              END IF
 
-             if (modal_aerosols) then
+             if (cloud_borne) then
                 xdelso4hp(i,k)  =  xso4(i,k) - xso4_init(i,k)
              endif
              !...........................
@@ -860,9 +867,9 @@ contains
     end do ver_loop1
 
     call sox_cldaero_update( &
-         ncol, lchnk, loffset, dtime, mbar, pdel, press, tfld, cldnum, cldfrc, cfact, cldconc%xlwc, &
-         xdelso4hp, xh2so4, xso4, xso4_init, nh3g, hno3g, xnh3, xhno3, xnh4c,  xno3c, xmsa, xso2, xh2o2, qcw, qin, &
-         aqso4, aqh2so4, aqso4_h2o2, aqso4_o3, aqso4_h2o2_3d=aqso4_h2o2_3d, aqso4_o3_3d=aqso4_o3_3d )
+          state, ncol, lchnk, loffset, dtime, mbar, pdel, press, tfld, cldnum, cldfrc, cfact, cldconc%xlwc, &
+          xdelso4hp, xh2so4, xso4, xso4_init, nh3g, hno3g, xnh3, xhno3, xnh4c,  xno3c, xmsa, xso2, xh2o2, qcw, qin, &
+          aqso4, aqh2so4, aqso4_h2o2, aqso4_o3, aqso4_h2o2_3d=aqso4_h2o2_3d, aqso4_o3_3d=aqso4_o3_3d )
 
     xphlwc(:,:) = 0._r8
     do k = 1, pver
@@ -875,6 +882,6 @@ contains
 
     call sox_cldaero_destroy_obj(cldconc)
 
-  end subroutine SETSOX
+  end subroutine setsox
 
-end module MO_SETSOX
+end module mo_setsox

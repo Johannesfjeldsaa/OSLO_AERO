@@ -103,18 +103,19 @@ contains
 
   end function sox_cldaero_create_obj
 
-  !===============================================================================
+  !=============================================================================
 
+  !-----------------------------------------------------------------------------
+  ! Update the mixing ratios
+  !-----------------------------------------------------------------------------
   subroutine sox_cldaero_update( &
-       ncol, lchnk, loffset, dtime, mbar, pdel, press, tfld, cldnum, cldfrc, cfact, xlwc, &
+       state, ncol, lchnk, loffset, dtime, mbar, pdel, press, tfld, cldnum, cldfrc, cfact, xlwc, &
        delso4_hprxn, xh2so4, xso4, xso4_init, nh3g, hno3g, xnh3, xhno3, xnh4c,  xno3c, xmsa, xso2, xh2o2, qcw, qin, &
        aqso4, aqh2so4, aqso4_h2o2, aqso4_o3, aqso4_h2o2_3d, aqso4_o3_3d)
-
-    !----------------------------------------------------------------------------------
-    ! Update the mixing ratios
-    !----------------------------------------------------------------------------------
+    use physics_types, only: physics_state
 
     ! arguments
+    type(physics_state), intent(in) :: state     ! Physics state variables
     integer,  intent(in)    :: ncol
     integer,  intent(in)    :: lchnk         ! chunk id
     integer,  intent(in)    :: loffset
