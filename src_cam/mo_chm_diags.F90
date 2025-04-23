@@ -76,6 +76,7 @@ contains
     use mo_drydep,    only : has_drydep
     use species_sums_diags, only : species_sums_init
     ! OSLO_AERO begin
+    use string_utils,    only: int2str
     use oslo_aero_share, only: getCloudTracerIndexDirect, getCloudTracerName, isAerosol
     use oslo_aero_share, only: aerosol_type_name, N_AEROSOL_TYPES, AEROSOL_TYPE_SULFATE
     use oslo_aero_share, only: l_so2, l_dms
@@ -119,7 +120,7 @@ contains
     logical :: history_dust
     ! OSLO_AERO begin
     integer :: cloudTracerIndex_direct
-    integer :: l_aero
+    integer :: l_aero, l_atype
     integer :: astat
     character(len=20) :: cloudTracerName
     ! OSLO_AERO end
@@ -136,14 +137,12 @@ contains
     ! allocate module variables
     allocate( DF_SO2(pcols, begchunk:endchunk), stat=astat )
     if( astat/= 0 ) then
-      write(iulog,*) 'chm_diags_inti: failed to allocate DF_SO2 array; error = ',astat
-      call endrun('chm_diags_inti: failed to allocate DF_SO2 array')
+      call endrun('chm_diags_inti: failed to allocate DF_SO2 array; error = '//int2str(astat))
     end if
     DF_SO2(:,:) = 0.0_r8
     allocate( WD_A_SO2(pcols, begchunk:endchunk), stat=astat )
     if( astat/= 0 ) then
-      write(iulog,*) 'chm_diags_inti: failed to allocate WD_A_SO2 array; error = ',astat
-      call endrun('chm_diags_inti: failed to allocate WD_A_SO2 array')
+      call endrun('chm_diags_inti: failed to allocate WD_A_SO2 array; error = '//int2str(astat))
     end if
     WD_A_SO2(:,:) = 0.0_r8
     ! OSLO_AERO end
@@ -529,7 +528,7 @@ contains
       endif
 
       if(n > 0) then
-         ! Add cloud tracers to default output
+         ! Add cloud tracers output fields for column burden and concentrations to output
          cloudTracerIndex_direct = getCloudTracerIndexDirect(n)
          if ( cloudTracerIndex_direct > 0 ) then
             ! first the 3d fields,
@@ -540,7 +539,6 @@ contains
                call add_default( trim(cloudTracerName), 1, ' ' )
             endif
 
-            ! and then then add column burden of cloud tracers
             call addfld('cb_'//trim(cloudTracerName),horiz_only, 'A', 'kg/m2', &
                'cb_'//trim(cloudTracerName)//' column in cloud water')
             if ( history_aerosol_decomposed ) then
@@ -548,17 +546,17 @@ contains
             endif
          endif
 
-         ! ... Then add the column burden in clean air
+         ! Add the column burden in for interstitial aerosols to output
          call addfld('cb_'//trim(spc_name),horiz_only, 'A', 'kg/m2', &
             'cb_'//trim(spc_name)//' in column')
 
-         ! ... and if it is so2 or dms we add the column burden of the sulfur
+         ! If the aerosol tracer is so2 or dms we add the column burden of the sulfur mass only as well to output
          if ( n == l_so2 .or. n == l_dms ) then
             call addfld(trim('cb_'//trim(spc_name)//'_S'), horiz_only, 'A', 'kg*S/m2', &
                'cb_'//trim(spc_name)//' column, sulfur mass only')
          endif
 
-         ! if the species is an aerosol we require history_aerosol_decomposed flag
+         ! if the species is an aerosol we require history_aerosol_decomposed flag to output the column burden
          if ( any( aer_species == m ) .or. isAerosol(n) ) then
             if ( history_aerosol_decomposed ) then
                call add_default('cb_'//trim(spc_name),1,' ' )
@@ -596,31 +594,30 @@ contains
     call addfld( 'AREA', horiz_only,  'A', 'm2', 'area of grid box' )
    ! OSLO_AERO begin
    ! iterate over the compounded aerosol types
-   do n=1,N_AEROSOL_TYPES
-
+   do l_atype=1,N_AEROSOL_TYPES
       ! add the column burden of the compound aerosols to output
-      call addfld('cb_'//trim(aerosol_type_name(n)),horiz_only, 'A', 'kg/m2',&
-         'cb_'//trim(aerosol_type_name(n))//' column of aerosol type')
-      if ( n == AEROSOL_TYPE_SULFATE ) then
-         call addfld('cb_'//trim(aerosol_type_name(n))//'_S',horiz_only, 'A', 'kg*S/m2',&
-         'cb_'//trim(aerosol_type_name(n))//' column of aerosol, sulfur mass only')
+      call addfld('cb_'//trim(aerosol_type_name(l_atype)),horiz_only, 'A', 'kg/m2',&
+         'cb_'//trim(aerosol_type_name(l_atype))//' column of aerosol type')
+      if ( l_atype == AEROSOL_TYPE_SULFATE ) then
+         call addfld('cb_'//trim(aerosol_type_name(l_atype))//'_S',horiz_only, 'A', 'kg*S/m2',&
+         'cb_'//trim(aerosol_type_name(l_atype))//' column of aerosol, sulfur mass only')
       endif
       ! we require history_aerosol_base flag
       if ( history_aerosol_base ) then
-         call add_default('cb_'//trim(aerosol_type_name(n)), 1, ' ')
+         call add_default('cb_'//trim(aerosol_type_name(l_atype)), 1, ' ')
 
          ! if the aerosol type is sulfur we make a version of the column burden that is only the sulfur
-         if ( n == AEROSOL_TYPE_SULFATE ) then
-            call add_default('cb_'//trim(aerosol_type_name(n))//'_S', 1, ' ')
+         if ( l_atype == AEROSOL_TYPE_SULFATE ) then
+            call add_default('cb_'//trim(aerosol_type_name(l_atype))//'_S', 1, ' ')
          endif
       endif
 
       ! add the mass mixing ratio of the compound aerosols to output
-      call addfld('mmr_'//trim(aerosol_type_name(n)),(/'lev'/),'A','kg/kg' ,&
-         'mmr_'//trim(aerosol_type_name(n))//' mmr of aerosol type')
+      call addfld('mmr_'//trim(aerosol_type_name(l_atype)),(/'lev'/),'A','kg/kg' ,&
+         'mmr_'//trim(aerosol_type_name(l_atype))//' mmr of aerosol type')
       ! we require history_aerosol_base flag
       if ( history_aerosol_base ) then
-         call add_default('mmr_'//trim(aerosol_type_name(n)), 1, ' ')
+         call add_default('mmr_'//trim(aerosol_type_name(l_atype)), 1, ' ')
       endif
    end do
    ! OSLO_AERO end
@@ -701,7 +698,8 @@ contains
     !--------------------------------------------------------------------
     ! OSLO_AERO begin
     real(r8), dimension(:,:), pointer :: cloudTracerField
-    integer                           :: cloudTracerIndex_direct
+    integer                           :: cloudTracerIndex_direct, &
+                                         l_atype
     character(len=20)                 :: cloudTracerName
     real(r8)                          :: mass_tmp(pcols,pver)
     real(r8)                          :: cb(pcols)
@@ -897,7 +895,7 @@ contains
          cb(:ncol) = sum(mass_tmp(:ncol,:),2)
          call outfld(trim('cb_'//trim(spc_name)), cb, pcols, lchnk)
          if ( n == l_so2 .or. n == l_dms ) then
-            call outfld(trim('cb_'//trim(spc_name)//'_S'), ( cb(:ncol) * sulfurMassFraction(n) ), pcols, lchnk)
+            call outfld(trim('cb_'//trim(spc_name)//'_S'), ( cb(:ncol) * sulfurMassFraction(n) ), ncol, lchnk)
          endif
 
          ! Add the column burden and mass mixing ratio of the interstitial tracers to the aerosol type cb and mmr
@@ -987,12 +985,12 @@ contains
     enddo
 
     ! OSLO_AERO begin
-    do n=1,N_AEROSOL_TYPES
-       call outfld("mmr_"//trim(aerosol_type_name(n)), mmr_aerosol_type(:ncol,:,n), ncol,lchnk)
-       call outfld("cb_"//trim(aerosol_type_name(n)), cb_aerosol_type(:ncol,n), ncol,lchnk)
+    do l_atype=1,N_AEROSOL_TYPES
+       call outfld("mmr_"//trim(aerosol_type_name(l_atype)), mmr_aerosol_type(:ncol,:,l_atype), ncol,lchnk)
+       call outfld("cb_"//trim(aerosol_type_name(l_atype)), cb_aerosol_type(:ncol,l_atype), ncol,lchnk)
 
-       if ( n == AEROSOL_TYPE_SULFATE ) then
-          call outfld("cb_"//trim(aerosol_type_name(n))//'_S', cb_SULFUR_S(:ncol), ncol,lchnk)
+       if ( l_atype == AEROSOL_TYPE_SULFATE ) then
+          call outfld("cb_"//trim(aerosol_type_name(l_atype))//'_S', cb_SULFUR_S(:ncol), ncol,lchnk)
        endif
     enddo
     ! OSLO_AERO end

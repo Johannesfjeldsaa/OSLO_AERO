@@ -45,7 +45,6 @@ module oslo_aero_depos
   public :: oslo_aero_depos_wet ! wet deposition
   public :: oslo_aero_wetdep_init
 
-
   ! Private interfaces
   private :: oslo_aero_depvel_part
   private :: oslo_set_srf_drydep
@@ -119,7 +118,7 @@ contains
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
     ! local variables
-    integer            :: m, l, i, n
+    integer            :: m, l, i, l_atype
     integer            :: lchnk
     integer            :: tracerIndex
     integer            :: astat, id
@@ -247,18 +246,18 @@ contains
 
    ! addfld and add_default for aerosol type deposition fields
    ! all will have dry and wet deposition, sulfate will have sulfur mass only in addition
-   do n=1,N_AEROSOL_TYPES
+   do l_atype=1,N_AEROSOL_TYPES
 
-      call addfld( 'dry_'//trim(aerosol_type_name(n)), horiz_only, 'A', unit_basename//'/m2/s ',  &
-         trim(aerosol_type_name(n))//' dry deposition flux at bottom (grav + turb)')
-      call addfld('wet_'//trim(aerosol_type_name(n)), horiz_only, 'A', unit_basename//'/m2/s', &
-         trim(aerosol_type_name(n))//' wet deposition flux at surface')
+      call addfld( 'dry_'//trim(aerosol_type_name(l_atype)), horiz_only, 'A', unit_basename//'/m2/s ',  &
+         trim(aerosol_type_name(l_atype))//' dry deposition flux at bottom (grav + turb)')
+      call addfld('wet_'//trim(aerosol_type_name(l_atype)), horiz_only, 'A', unit_basename//'/m2/s', &
+         trim(aerosol_type_name(l_atype))//' wet deposition flux at surface')
 
-      if ( n == AEROSOL_TYPE_SULFATE ) then
-         call addfld( 'dry_'//trim(aerosol_type_name(n))//'_S', horiz_only, 'A', unit_basename//'*S/m2/s ',  &
-            trim(aerosol_type_name(n))//' dry deposition flux at bottom (grav + turb), sulfur mass only')
-         call addfld('wet_'//trim(aerosol_type_name(n))//'_S', horiz_only, 'A', unit_basename//'*S/m2/s', &
-            trim(aerosol_type_name(n))//' wet deposition flux at surface, sulfur mass only')
+      if ( l_atype == AEROSOL_TYPE_SULFATE ) then
+         call addfld( 'dry_'//trim(aerosol_type_name(l_atype))//'_S', horiz_only, 'A', unit_basename//'*S/m2/s ',  &
+            trim(aerosol_type_name(l_atype))//' dry deposition flux at bottom (grav + turb), sulfur mass only')
+         call addfld('wet_'//trim(aerosol_type_name(l_atype))//'_S', horiz_only, 'A', unit_basename//'*S/m2/s', &
+            trim(aerosol_type_name(l_atype))//' wet deposition flux at surface, sulfur mass only')
          call addfld('wd_a_h2so4_debug', horiz_only, 'A', unit_basename//'*S/m2/s', &
             'wd_a_h2so4_debug')
       endif
@@ -266,12 +265,12 @@ contains
       ! we require history_aerosol_base flag to add the fields to default output
       if ( history_aerosol_base ) then
 
-         call add_default('dry_'//trim(aerosol_type_name(n)), 1, ' ')
-         call add_default('wet_'//trim(aerosol_type_name(n)), 1, ' ')
+         call add_default('dry_'//trim(aerosol_type_name(l_atype)), 1, ' ')
+         call add_default('wet_'//trim(aerosol_type_name(l_atype)), 1, ' ')
 
-         if ( n == AEROSOL_TYPE_SULFATE ) then
-            call add_default('dry_'//trim(aerosol_type_name(n))//'_S', 1, ' ')
-            call add_default('wet_'//trim(aerosol_type_name(n))//'_S', 1, ' ')
+         if ( l_atype == AEROSOL_TYPE_SULFATE ) then
+            call add_default('dry_'//trim(aerosol_type_name(l_atype))//'_S', 1, ' ')
+            call add_default('wet_'//trim(aerosol_type_name(l_atype))//'_S', 1, ' ')
             call add_default('wd_a_h2so4_debug', 1, ' ')
          endif
 
@@ -337,7 +336,7 @@ contains
     integer :: lphase                    ! index for interstitial / cloudborne aerosol
     integer :: lspec                     ! index for aerosol number / chem-mass / water-mass
     integer :: m                         ! aerosol mode index
-    integer :: n                         ! aerosol type index
+    integer :: l_atype                   ! aerosol type index
     integer :: mm                        ! tracer index
     integer :: i
 
@@ -615,11 +614,11 @@ contains
             cam_out%dstdry1, cam_out%dstdry2, cam_out%dstdry3, cam_out%dstdry4)
     endif
 
-   do n=1,N_AEROSOL_TYPES
+   do l_atype=1,N_AEROSOL_TYPES
       ! add the dry deposition rate of the compound aerosols to output
-      call outfld('dry_'//trim(aerosol_type_name(n)), sflx_DDF_arosol_type(:ncol,n), ncol, lchnk)
-      if ( n == AEROSOL_TYPE_SULFATE ) then
-         call outfld('dry_'//trim(aerosol_type_name(n))//'_S', sflx_DDF_SULFATE_S(:ncol), ncol, lchnk)
+      call outfld('dry_'//trim(aerosol_type_name(l_atype)), sflx_DDF_arosol_type(:ncol,l_atype), ncol, lchnk)
+      if ( l_atype == AEROSOL_TYPE_SULFATE ) then
+         call outfld('dry_'//trim(aerosol_type_name(l_atype))//'_S', sflx_DDF_SULFATE_S(:ncol), ncol, lchnk)
       endif
    end do
 
@@ -651,7 +650,7 @@ contains
 
     ! Local variables
     integer  :: m                             ! tracer index
-    integer  :: n                             ! aerosol type index
+    integer  :: l_atype                       ! aerosol type index
     integer  :: i,k,mm
     real(r8) :: iscavt(pcols, pver)
     real(r8) :: icscavt(pcols, pver)
@@ -940,7 +939,6 @@ contains
                   enddo
                enddo
 
-
                call outfld( trim(getCloudTracerName(mm))//'SFWET', sflx(:ncol), ncol, lchnk)
                aerdepwetcw(:ncol,mm) = sflx(:ncol)
 
@@ -995,22 +993,18 @@ contains
    enddo   ! m = 1, ntot_amode
 
    ! add the wet deposition rate of the compound aerosols except sulfur to output
-   do n=1,N_AEROSOL_TYPES
-      if ( n /= AEROSOL_TYPE_SULFATE ) then
-         call outfld('wet_'//trim(aerosol_type_name(n)), sflx_SFWET_arosol_type(:ncol,n), ncol, lchnk)
-      else if ( n == AEROSOL_TYPE_SULFATE ) then
+   do l_atype=1,N_AEROSOL_TYPES
+      if ( l_atype /= AEROSOL_TYPE_SULFATE ) then
+         call outfld('wet_'//trim(aerosol_type_name(l_atype)), sflx_SFWET_arosol_type(:ncol,l_atype), ncol, lchnk)
+      else if ( l_atype == AEROSOL_TYPE_SULFATE ) then
          ! Add in wd_a_h2so4 from het_diags (mo_chm_diags.F90)
          idx_wd_a_h2so4 = pbuf_get_index('WD_A_H2SO4')
          call pbuf_get_field(pbuf, idx_wd_a_h2so4, wd_a_h2so4)
 
-         if (masterproc) then
-            write(iulog, *) 'getting wd_a_h2so4 from pbuf using indx = ', idx_wd_a_h2so4, '. tot sum = ', sum(wd_a_h2so4(:))
-         endif
-
-         call outfld('wet_'//trim(aerosol_type_name(n)),                &
-            ( sflx_SFWET_arosol_type(:ncol,n) + wd_a_h2so4(:ncol) ),    &
+         call outfld('wet_'//trim(aerosol_type_name(l_atype)),                &
+            ( sflx_SFWET_arosol_type(:ncol,l_atype) + wd_a_h2so4(:ncol) ),    &
             ncol, lchnk)
-         call outfld('wet_'//trim(aerosol_type_name(n))//'_S',                                        &
+         call outfld('wet_'//trim(aerosol_type_name(l_atype))//'_S',                                        &
             ( sflx_SFWET_SULFATE_S(:ncol) + ( wd_a_h2so4(:ncol) * sulfurMassFraction(l_h2so4) )),     &
             ncol, lchnk)
          call outfld('wd_a_h2so4_debug', wd_a_h2so4(:ncol), ncol, lchnk)
@@ -1609,7 +1603,6 @@ contains
     !-----------------------------------------------------------------------
 
     real(r8), intent(in) ::&
-
          p(pcols,pver),        &! pressure
          q(pcols,pver),        &! moisture
          pdel(pcols,pver),     &! pressure thikness

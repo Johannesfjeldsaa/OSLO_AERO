@@ -790,6 +790,7 @@ contains
       use short_lived_species, only : short_lived_species_initic
       use aero_model,            only : aero_model_init
       ! OSLO_AERO begin
+      use string_utils,          only : int2str
       use phys_control,          only : history_aerosol_base
       use oslo_aero_share,       only : N_AEROSOL_TYPES, aerosol_type_name
       use oslo_aero_share,       only : l_dms, l_so2, l_isoprene, l_monoterp
@@ -836,26 +837,22 @@ contains
       ! then set them to zero
       allocate( SFBC(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'chem_init: failed to allocate SFBC array; error = ',astat
-         call endrun('chem_init: failed to allocate SFBC array')
+         call endrun('chem_init: failed to allocate SFBC array; error = '//int2str(astat))
       end if
       SFBC(:,:) = 0.0_r8
       allocate( SFOM(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'chem_init: failed to allocate SFOM array; error = ',astat
-         call endrun('chem_init: failed to allocate SFOM array')
+         call endrun('chem_init: failed to allocate SFOM array; error = '//int2str(astat))
       end if
       SFOM(:,:) = 0.0_r8
       allocate( SFSULFATE(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'chem_init: failed to allocate SFSULFATE array; error = ',astat
-         call endrun('chem_init: failed to allocate SFSULFATE array')
+         call endrun('chem_init: failed to allocate SFSULFATE array; error = '//int2str(astat))
       end if
       SFSULFATE(:,:) = 0.0_r8
       allocate( SFSO2(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'chem_init: failed to allocate SFSO2 array; error = ',astat
-         call endrun('chem_init: failed to allocate SFSO2 array')
+         call endrun('chem_init: failed to allocate SFSO2 array; error = '//int2str(astat))
       end if
       SFSO2(:,:) = 0.0_r8
       !OSLO_AERO end
@@ -1094,7 +1091,7 @@ contains
       ! local vars
 
       integer :: lchnk, ncol
-      integer :: i, m, n, n2
+      integer :: i, m, n
 
       real(r8) :: sflx(pcols,gas_pcnst)
       real(r8) :: megflx(pcols)

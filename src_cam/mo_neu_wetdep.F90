@@ -62,6 +62,7 @@ subroutine neu_wetdep_init
   use cam_history,  only : addfld, add_default, horiz_only
   use phys_control, only : phys_getopts
   ! OSLO_AERO begin
+  use string_utils, only : int2str
   use ppgrid,       only : pcols, begchunk, endchunk
   ! OSLO_AERO end
 !
@@ -87,8 +88,7 @@ subroutine neu_wetdep_init
   ! OSLO_AERO begin
   allocate( WD_A_SO2_NEU(pcols, begchunk:endchunk), stat=astat )
   if( astat/= 0 ) then
-    write(iulog,*) 'neu_wetdep_init: failed to allocate WD_A_SO2 array; error = ',astat
-    call endrun('neu_wetdep_init: failed to allocate WD_A_SO2 array')
+    call endrun('neu_wetdep_init: failed to allocate WD_A_SO2 array; error = '//int2str(astat))
   end if
   WD_A_SO2_NEU(:,:) = 0.0_r8
   ! OSLO_AERO end
@@ -264,7 +264,7 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
   use constituents,     only : cnst_get_ind
   use mo_tracname,      only : solsym
   ! OSLO_AERO end
-  implicit none
+
 !
   integer,        intent(in)    :: lchnk,ncol
   real(r8),       intent(in)    :: mmr(pcols,pver,pcnst)    ! mass mixing ratio (kg/kg)
@@ -280,6 +280,9 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
   real(r8),       intent(in)    :: cmfdqr(ncol, pver)
   real(r8),       intent(inout) :: wd_tend(pcols,pver,pcnst)
   real(r8),       intent(inout) :: wd_tend_int(pcols,pcnst)
+  ! OSLO_AERO begin
+  type(physics_buffer_desc),  pointer :: pbuf(:)
+  ! OSLO_AERO end
 !
 ! local arrays and variables
 !
@@ -313,7 +316,6 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
   real(r8)    :: wrk_wd(pcols)
   logical     :: history_aerosol
   integer     :: l_aero
-  type(physics_buffer_desc),  pointer :: pbuf(:)
   real(r8),                   pointer :: wd_a_h2so4(:)
   ! OSLO_AERO end
 !

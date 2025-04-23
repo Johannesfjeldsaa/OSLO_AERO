@@ -126,7 +126,6 @@ contains
   !===============================================================================
   subroutine oslo_aero_ocean_init()
 
-    
     use phys_control,   only : history_aerosol_forcing
 
     ! local variables
@@ -186,7 +185,7 @@ contains
             oceanspcs(m)%fields, oceanspcs(m)%file, rmv_file, &
             cycle_yr(m), fixed_ymd, fixed_tod, data_type(m) )
     enddo
-    
+
     call addfld( 'odms', horiz_only,  'A',  'nmol/L', 'DMS upper ocean concentration' )
     if ( history_aerosol_forcing ) then
       call add_default('odms', 1, ' ')

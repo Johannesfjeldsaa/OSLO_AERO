@@ -52,7 +52,7 @@ module mo_extfrc
   ! SO2_CMXF = SO2_CMXF, we use l_so2 for logic
   ! SO4_PR_CMXF = SO4_PR_CMXF, we use l_so4_pr for logic
   real(r8), public, protected, allocatable   :: CMXF_fields(:,:,:)
-  ! OSLO_AERO end 
+  ! OSLO_AERO end
 
 contains
 
@@ -74,6 +74,7 @@ contains
     use m_MergeSorts,  only : IndexSort
     ! OSLO_AERO begin
     use phys_control,  only : history_aerosol_decomposed
+    use string_utils,  only : int2str
     ! OSLO_AERO end
 
     implicit none
@@ -117,10 +118,10 @@ contains
     real(r8) :: xdbl
 
     !-----------------------------------------------------------------------
- 
+
     call phys_getopts( &
          history_aerosol_out = history_aerosol, &
-         history_chemistry_out = history_chemistry, & 
+         history_chemistry_out = history_chemistry, &
          history_cesm_forcing_out = history_cesm_forcing )
 
     !-----------------------------------------------------------------------
@@ -139,7 +140,7 @@ contains
 
        i = scan(extfrc_specifier(n),'->')
        spc_name = trim(adjustl(extfrc_specifier(n)(:i-1)))
-       
+
        ! need to parse out scalefactor ...
        tmp_string = adjustl(extfrc_specifier(n)(i+2:))
        j = scan( tmp_string, '*' )
@@ -186,8 +187,7 @@ contains
     !-----------------------------------------------------------------------
     allocate( forcings(n_frc_files), stat=astat )
     if( astat/= 0 ) then
-       write(iulog,*) 'extfrc_inti: failed to allocate forcings array; error = ',astat
-       call endrun('extfrc_inti: failed to allocate forcings array')
+       call endrun('extfrc_inti: failed to allocate forcings array; error = '//int2str(astat))
     end if
 
     ! OSLO_AERO begin
@@ -196,14 +196,13 @@ contains
     !-----------------------------------------------------------------------
     allocate( CMXF_fields(pcols, pcnst, begchunk:endchunk), stat=astat )
     if( astat/= 0 ) then
-       write(iulog,*) 'extfrc_inti: failed to allocate CMXF_fields array; error = ',astat
-       call endrun('extfrc_inti: failed to allocate CMXF_fields array')
+       call endrun('extfrc_inti: failed to allocate CMXF_fields array; error = '//int2str(astat))
     end if
     CMXF_fields(:,:,:) = 0.0_r8
     ! OSLO_AERO end
-    
+
     !-----------------------------------------------------------------------
-    ! Sort the input files so that the emissions sources are summed in the 
+    ! Sort the input files so that the emissions sources are summed in the
     ! same order regardless of the order of the input files in the namelist
     !-----------------------------------------------------------------------
     if (n_frc_files > 0) then
@@ -213,14 +212,14 @@ contains
     !-----------------------------------------------------------------------
     ! 	... setup the forcing type array
     !-----------------------------------------------------------------------
-    do m=1,n_frc_files 
+    do m=1,n_frc_files
        forcings(m)%frc_ndx     = frc_indexes(indx(m))
        forcings(m)%species     = frc_species(indx(m))
        forcings(m)%filename    = frc_fnames(indx(m))
        forcings(m)%scalefactor = frc_scalefactor(indx(m))
     enddo
-    
-    do n= 1,extcnt 
+
+    do n= 1,extcnt
        if (frc_from_dataset(n)) then
           spc_name = extfrc_lst(n)
           call addfld( trim(spc_name)//'_XFRC', (/ 'lev' /), 'A',  'molec/cm3/s', &
@@ -239,9 +238,6 @@ contains
           endif
        endif
     enddo
-
-    
-
 
     if (masterproc) then
        !-----------------------------------------------------------------------
@@ -355,7 +351,7 @@ contains
 
     implicit none
 
-    type(physics_state), intent(in):: state(begchunk:endchunk)                 
+    type(physics_state), intent(in):: state(begchunk:endchunk)
     type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
     !-----------------------------------------------------------------------
@@ -401,7 +397,7 @@ contains
     real(r8),parameter :: kg_to_g = 1.e-3_r8
     real(r8) :: molec_to_kg
     integer  :: spc_ndx
-    !OSLO_AERO begin 
+    !OSLO_AERO begin
     integer  :: l_aero
     !OSLO_AERO end
 
@@ -410,7 +406,7 @@ contains
     end if
 
     frcing(:,:,:) = 0._r8
-    !OSLO_AERO begin 
+    !OSLO_AERO begin
     CMXF_fields(:ncol,:,lchnk) = 0.0_r8
     !OSLO_AERO end
 
@@ -442,7 +438,7 @@ contains
              frcing_col(:ncol) = frcing_col(:ncol) + frcing(:ncol,k,n)*(zint(:ncol,k)-zint(:ncol,k+1))*km_to_cm
              frcing_col_kg(:ncol) = frcing_col_kg(:ncol) + frcing(:ncol,k,n)*(zint(:ncol,k)-zint(:ncol,k+1))*km_to_cm*molec_to_kg
           enddo
-          
+
           !OSLO_AERO begin
           ! get the index of the forcing index that coresponds to the l_spc system
           call cnst_get_ind(trim(extfrc_lst(n)), l_aero, abort=.false.)
@@ -453,7 +449,6 @@ contains
           call outfld( xfcname, frcing_col(:ncol), ncol, lchnk )
           xfcname = trim(extfrc_lst(n))//'_CMXF'
           call outfld( xfcname, frcing_col_kg(:ncol), ncol, lchnk )
-          
        endif
     end do frc_loop
 

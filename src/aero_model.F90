@@ -55,7 +55,6 @@ module aero_model
    use oslo_aero_ocean,          only: oslo_aero_ocean_init, oslo_aero_dms_emis
    use oslo_aero_share,          only: getNumberofTracersInMode, getCloudTracerIndexDirect, getCloudTracerName
    use oslo_aero_share,          only: getCloudTracerName, getTracerIndex, aero_register
-   use oslo_aero_share,          only: sulfur_mass_fraction_register, soa_yield_register
    use oslo_aero_sox_cldaero,    only: sox_cldaero_init
    use oslo_aero_microp,         only: oslo_aero_microp_readnl
    use oslo_aero_sw_tables,      only: initopt
@@ -151,7 +150,9 @@ contains
 
    !=============================================================================
    subroutine aero_model_register()
-      use oslo_aero_share, only: aero_register
+      use oslo_aero_share, only: aero_register,                   &
+                                 sulfur_mass_fraction_register,   &
+                                 soa_yield_register
       use oslo_aero_depos, only: oslo_aero_depos_register
 
       call aero_register()
@@ -167,6 +168,8 @@ contains
    !=============================================================================
    subroutine aero_model_init( pbuf2d )
 
+      use string_utils, only: int2str
+
       ! args
       type(physics_buffer_desc), pointer :: pbuf2d(:,:)
 
@@ -181,56 +184,47 @@ contains
       ! allocate module variables
       allocate( GS_SOA(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'aero_model_init: failed to allocate GS_SOA array; error = ',astat
-         call endrun('aero_model_init: failed to allocate GS_SOA array')
+         call endrun('aero_model_init: failed to allocate GS_SOA array; error = '//int2str(astat))
       end if
       GS_SOA(:,:) = 0.0_r8
       allocate( GS_H2SO4(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'aero_model_init: failed to allocate GS_H2SO4 array; error = ',astat
-         call endrun('aero_model_init: failed to allocate GS_H2SO4 array')
+         call endrun('aero_model_init: failed to allocate GS_H2SO4 array; error = '//int2str(astat))
       end if
       GS_H2SO4(:,:) = 0.0_r8
       allocate( GS_DMS(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'aero_model_init: failed to allocate GS_DMS array; error = ',astat
-         call endrun('aero_model_init: failed to allocate GS_DMS array')
+         call endrun('aero_model_init: failed to allocate GS_DMS array; error = '//int2str(astat))
       end if
       GS_DMS(:,:) = 0.0_r8
       allocate( GS_SO2(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'aero_model_init: failed to allocate GS_SO2 array; error = ',astat
-         call endrun('aero_model_init: failed to allocate GS_SO2 array')
+         call endrun('aero_model_init: failed to allocate GS_SO2 array; error = '//int2str(astat))
       end if
       GS_SO2(:,:) = 0.0_r8
       allocate( GS_isoprene(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'aero_model_init: failed to allocate GS_isoprene array; error = ',astat
-         call endrun('aero_model_init: failed to allocate GS_isoprene array')
+         call endrun('aero_model_init: failed to allocate GS_isoprene array; error = '//int2str(astat))
       end if
       GS_isoprene(:,:) = 0.0_r8
       allocate( GS_monoterp(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'aero_model_init: failed to allocate GS_monoterp array; error = ',astat
-         call endrun('aero_model_init: failed to allocate GS_monoterp array')
+         call endrun('aero_model_init: failed to allocate GS_monoterp array; error = '//int2str(astat))
       end if
       GS_monoterp(:,:) = 0.0_r8
       allocate( AQ_H2SO4(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'aero_model_init: failed to allocate AQ_H2SO4 array; error = ',astat
-         call endrun('aero_model_init: failed to allocate AQ_H2SO4 array')
+         call endrun('aero_model_init: failed to allocate AQ_H2SO4 array; error = '//int2str(astat))
       end if
       AQ_H2SO4(:,:) = 0.0_r8
       allocate( AQ_SO4_A2_OCW(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'aero_model_init: failed to allocate AQ_SO4_A2_OCW array; error = ',astat
-         call endrun('aero_model_init: failed to allocate AQ_SO4_A2_OCW array')
+         call endrun('aero_model_init: failed to allocate AQ_SO4_A2_OCW array; error = '//int2str(astat))
       end if
       AQ_SO4_A2_OCW(:,:) = 0.0_r8
       allocate( AQ_SO2(pcols, begchunk:endchunk), stat=astat )
       if( astat/= 0 ) then
-         write(iulog,*) 'aero_model_init: failed to allocate AQ_SO2 array; error = ',astat
-         call endrun('aero_model_init: failed to allocate AQ_SO2 array')
+         call endrun('aero_model_init: failed to allocate AQ_SO2 array; error = '//int2str(astat))
       end if
       AQ_SO2(:,:) = 0.0_r8
 
