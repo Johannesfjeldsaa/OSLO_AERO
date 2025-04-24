@@ -1677,7 +1677,9 @@ contains
       ! import variables
       ! -----------------------------------------------------------------------
       use cam_history,        only  : addfld, add_default, horiz_only
-      use phys_control,       only  : history_aerosol_base, history_gas
+      use phys_control,       only  : history_aerosol_base,    &
+                                      history_gas,             &
+                                      history_aerosol_debug_output
 
       ! -----------------------------------------------------------------------
       ! Initialisation of fields, orderered as in DESCRIPTION
@@ -1721,13 +1723,16 @@ contains
       ! TEMPORARY FIELDS
       call addfld ('tot_dms_lost_as_S', horiz_only, 'A',  'kg/m2/s',   &
          'tmp field, REMOVE BFR PR.')
-      call add_default('tot_dms_lost_as_S', 1, ' ')
       call addfld ('msa_prod_from_dms_as_S', horiz_only, 'A',  'kg/m2/s',   &
       'tmp field, REMOVE BFR PR.')
-      call add_default('msa_prod_from_dms_as_S', 1, ' ')
       call addfld ('SO2_formed_from_DMS_as_S', horiz_only, 'A',  'kg/m2/s',   &
          'tmp field, REMOVE BFR PR.')
-      call add_default('SO2_formed_from_DMS_as_S', 1, ' ')
+
+      if ( history_aerosol_debug_output ) then
+         call add_default('tot_dms_lost_as_S', 1, ' ')
+         call add_default('SO2_formed_from_DMS_as_S', 1, ' ')
+         call add_default('msa_prod_from_dms_as_S', 1, ' ')
+      endif
 
       if ( history_aerosol_base ) then
          ! SO2

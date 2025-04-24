@@ -10,7 +10,9 @@ module oslo_aero_depos
   use ppgrid,                  only: pcols, pver, pverp, begchunk, endchunk
   use constituents,            only: pcnst, cnst_name, cnst_get_ind
   use phys_control,            only: phys_getopts, cam_physpkg_is
-  use phys_control,            only: history_aerosol_base, history_aerosol_decomposed
+  use phys_control,            only: history_aerosol_base,        &
+                                     history_aerosol_decomposed,  &
+                                     history_aerosol_debug_output
   use cam_abortutils,          only: endrun
   use cam_logfile,             only: iulog
   use camsrfexch,              only: cam_out_t
@@ -271,9 +273,11 @@ contains
          if ( l_atype == AEROSOL_TYPE_SULFATE ) then
             call add_default('dry_'//trim(aerosol_type_name(l_atype))//'_S', 1, ' ')
             call add_default('wet_'//trim(aerosol_type_name(l_atype))//'_S', 1, ' ')
-            call add_default('wd_a_h2so4_debug', 1, ' ')
          endif
 
+      endif
+      if ( history_aerosol_debug_output .and. l_atype == AEROSOL_TYPE_SULFATE ) then
+         call add_default('wd_a_h2so4_debug', 1, ' ')
       endif
    end do
 
