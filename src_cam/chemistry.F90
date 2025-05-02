@@ -157,6 +157,7 @@ end function chem_is
 !
 !-----------------------------------------------------------------------
 
+    use string_utils,        only : strlist_get_ind
     use mo_sim_dat,          only : set_sim_dat
     use chem_mods,           only : gas_pcnst, adv_mass
     use mo_tracname,         only : solsym
@@ -168,8 +169,7 @@ end function chem_is
     use aero_model,          only : aero_model_register
     use physics_buffer,      only : pbuf_add_field, dtype_r8
     use upper_bc,            only : ubc_fixed_conc
-
-    implicit none
+    use oslo_aero_share,     only : aerosol_names
 
 !-----------------------------------------------------------------------
 ! Local variables
@@ -242,14 +242,15 @@ end function chem_is
        has_fixed_ubc = ubc_fixed_conc(solsym(m))
        has_fixed_ubflx = .false.
        ndropmixed = .false.
-       lng_name      = trim( solsym(m) )
+       lng_name = trim( solsym(m) )
        molectype = 'minor'
 
        qmin = 1.e-36_r8
 
-       if (index(lng_name,'_a') > 0) then ! modal aerosol species undergoes ndrop activation mixing
+       call strlist_get_ind(aerosol_names, solsym(m), n, abort=.false.)
+       if (n > 0) then
           ndropmixed = .true.
-       endif
+       end if
 
        if ( lng_name(1:5) .eq. 'num_a' ) then ! aerosol number density
           qmin = 1.e-5_r8
@@ -303,8 +304,9 @@ end function chem_is
        if ( islvd > 0 ) then
           short_lived_map(islvd) = m
        else
-          call cnst_add( solsym(m), adv_mass(m), cptmp, qmin, n, readiv=ic_from_cam2, cam_outfld=cam_outfld, &
-                         mixtype=mixtype, molectype=molectype, ndropmixed=ndropmixed, &
+          call cnst_add(solsym(m), adv_mass(m), cptmp, qmin, n, &
+               readiv=ic_from_cam2, cam_outfld=cam_outfld, &
+               mixtype=mixtype, molectype=molectype, ndropmixed=ndropmixed, &
                          fixed_ubc=has_fixed_ubc, fixed_ubflx=has_fixed_ubflx, &
                          longname=trim(lng_name) )
 
