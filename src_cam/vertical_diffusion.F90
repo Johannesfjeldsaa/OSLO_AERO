@@ -67,7 +67,6 @@ use physconst,        only :          &
      mwdry  , &     ! Molecular weight of dry air
      avogad         ! Avogadro's number
 use cam_history,      only : fieldname_len
-use perf_mod
 use cam_logfile,      only : iulog
 use ref_pres,         only : do_molec_diff, nbot_molec
 use phys_control,     only : phys_getopts
@@ -78,7 +77,6 @@ use oslo_aero_share,  only: getNumberOfAerosolTracers, fillAerosolTracerList
 
 implicit none
 private
-save
 
 ! ----------------- !
 ! Public interfaces !
@@ -136,15 +134,18 @@ integer              :: clubbtop_idx = -1
 
 logical              :: diff_cnsrv_mass_check        ! do mass conservation check
 logical              :: do_iss                       ! switch for implicit turbulent surface stress
-logical              :: prog_modal_aero = .true.     ! set true if prognostic modal aerosols are present
-integer              :: pmam_ncnst = 0               ! number of prognostic modal aerosol constituents
-integer, allocatable :: pmam_cnst_idx(:)             ! constituent indices of prognostic modal aerosols
 
 logical              :: do_pbl_diags = .false.
 logical              :: waccmx_mode = .false.
 logical              :: do_hb_above_clubb = .false.
 
 real(r8),allocatable :: kvm_sponge(:)
+
+! OSLO_AERO begin
+logical              :: prog_modal_aero = .true.
+integer              :: pmam_ncnst = 0   ! number of prognostic modal aerosol constituents
+integer, allocatable :: pmam_cnst_idx(:) ! constituent indices of prognostic modal aerosols
+! OSLO_AERO end
 
 contains
 
@@ -235,8 +236,8 @@ subroutine vd_register()
   call pbuf_add_field('tauresx',  'global', dtype_r8, (/pcols/),        tauresx_idx)
   call pbuf_add_field('tauresy',  'global', dtype_r8, (/pcols/),        tauresy_idx)
 
-  call pbuf_add_field('tpert', 'global', dtype_r8, (/pcols/),                       tpert_idx)
-  call pbuf_add_field('qpert', 'global', dtype_r8, (/pcols,pcnst/),                 qpert_idx)
+  call pbuf_add_field('tpert', 'global', dtype_r8, (/pcols/),           tpert_idx)
+  call pbuf_add_field('qpert', 'global', dtype_r8, (/pcols/),           qpert_idx)
 
   if (trim(shallow_scheme) == 'UNICON') then
      call pbuf_add_field('qtl_flx',  'global', dtype_r8, (/pcols, pverp/), qtl_flx_idx)
@@ -273,12 +274,10 @@ subroutine vertical_diffusion_init(pbuf2d)
   use hb_diff,           only : init_hb_diff
   use molec_diff,        only : init_molec_diff
   use diffusion_solver,  only : init_vdiff, new_fieldlist_vdiff, vdiff_select
-  use constituents,      only : cnst_get_ind, cnst_get_type_byind, cnst_name, cnst_get_molec_byind
+  use constituents,      only : cnst_get_ind, cnst_get_type_byind, cnst_name, cnst_get_molec_byind, cnst_ndropmixed
   use spmd_utils,        only : masterproc
   use ref_pres,          only : press_lim_idx, pref_mid
   use physics_buffer,    only : pbuf_set_field, pbuf_get_index, physics_buffer_desc
-  use rad_constituents,  only : rad_cnst_get_info, rad_cnst_get_mode_num_idx, &
-       rad_cnst_get_mam_mmr_idx
   use trb_mtn_stress_cam,only : trb_mtn_stress_init
   use beljaars_drag_cam, only : beljaars_drag_init
   use upper_bc,          only : ubc_init
@@ -700,25 +699,27 @@ subroutine vertical_diffusion_tend( &
   use camsrfexch,         only : cam_in_t
   use cam_history,        only : outfld
 
-  use trb_mtn_stress_cam, only : trb_mtn_stress_tend
-  use beljaars_drag_cam,  only : beljaars_drag_tend
-  use eddy_diff_cam,      only : eddy_diff_tend
-  use hb_diff,            only : compute_hb_diff, compute_hb_free_atm_diff
-  use wv_saturation,      only : qsat
-  use molec_diff,         only : compute_molec_diff, vd_lu_qdecomp
-  use constituents,       only : qmincg, qmin, cnst_type
-  use diffusion_solver,   only : compute_vdiff, any, operator(.not.)
-  use air_composition,    only : cpairv, rairv !Needed for calculation of upward H flux
-  use time_manager,       only : get_nstep
-  use constituents,       only : cnst_get_type_byind, cnst_name, &
-       cnst_mw, cnst_fixed_ubc, cnst_fixed_ubflx
-  use physconst,          only : pi
-  use pbl_utils,          only : virtem, calc_obklen, calc_ustar
-  use upper_bc,           only : ubc_get_vals, ubc_fixed_temp
-  use upper_bc,           only : ubc_get_flxs
-  use coords_1d,          only : Coords1D
-  use phys_control,       only : cam_physpkg_is
-  use ref_pres,           only : ptop_ref
+  use trb_mtn_stress_cam,   only : trb_mtn_stress_tend
+  use beljaars_drag_cam,    only : beljaars_drag_tend
+  use eddy_diff_cam,        only : eddy_diff_tend
+  use hb_diff,              only : compute_hb_diff, compute_hb_free_atm_diff
+  use wv_saturation,        only : qsat
+  use molec_diff,           only : compute_molec_diff, vd_lu_qdecomp
+  use constituents,         only : qmincg, qmin, cnst_type
+  use diffusion_solver,     only : compute_vdiff, any, operator(.not.)
+  use air_composition,      only : cpairv, rairv !Needed for calculation of upward H flux
+  use time_manager,         only : get_nstep
+  use constituents,         only : cnst_get_type_byind, cnst_name, &
+                                   cnst_mw, cnst_fixed_ubc, cnst_fixed_ubflx, cnst_ndropmixed
+  use physconst,            only : pi
+  use atmos_phys_pbl_utils, only: calc_virtual_temperature, calc_ideal_gas_rrho, calc_friction_velocity,                             &
+                                  calc_kinematic_heat_flux, calc_kinematic_water_vapor_flux, calc_kinematic_buoyancy_flux, &
+                                  calc_obukhov_length
+  use upper_bc,             only : ubc_get_vals, ubc_fixed_temp
+  use upper_bc,             only : ubc_get_flxs
+  use coords_1d,            only : Coords1D
+  use phys_control,         only : cam_physpkg_is
+  use ref_pres,             only : ptop_ref
 
   ! --------------- !
   ! Input Arguments !
@@ -1007,10 +1008,12 @@ subroutine vertical_diffusion_tend( &
 
      ! The diag_TKE scheme does not calculate the Monin-Obukhov length, which is used in dry deposition calculations.
      ! Use the routines from pbl_utils to accomplish this. Assumes ustar and rrho have been set.
-     call virtem(ncol, th(:ncol,pver),state%q(:ncol,pver,1), thvs(:ncol))
-     call calc_obklen(ncol, th(:ncol,pver), thvs(:ncol), cam_in%cflx(:ncol,1), &
-          cam_in%shf(:ncol), rrho(:ncol), ustar(:ncol), &
-          khfs(:ncol),    kqfs(:ncol), kbfs(:ncol),   obklen(:ncol))
+      thvs  (:ncol) = calc_virtual_temperature(th(:ncol,pver), state%q(:ncol,pver,1), zvir)
+
+      khfs  (:ncol) = calc_kinematic_heat_flux(cam_in%shf(:ncol), rrho(:ncol), cpair)
+      kqfs  (:ncol) = calc_kinematic_water_vapor_flux(cam_in%cflx(:ncol,1), rrho(:ncol))
+      kbfs  (:ncol) = calc_kinematic_buoyancy_flux(khfs(:ncol), zvir, th(:ncol,pver), kqfs(:ncol))
+      obklen(:ncol) = calc_obukhov_length(thvs(:ncol), ustar(:ncol), gravit, karman, kbfs(:ncol))
 
 
   case ( 'HB', 'HBR' )
@@ -1063,14 +1066,13 @@ subroutine vertical_diffusion_tend( &
       ! is only handling other things, e.g. some boundary conditions, tms,
       ! and molecular diffusion.
 
-      call virtem(ncol, th(:ncol,pver),state%q(:ncol,pver,1), thvs(:ncol))
-
-      call calc_ustar( ncol, state%t(:ncol,pver), state%pmid(:ncol,pver), &
-           cam_in%wsx(:ncol), cam_in%wsy(:ncol), rrho(:ncol), ustar(:ncol))
-      ! Use actual qflux, not lhf/latvap as was done previously
-      call calc_obklen( ncol, th(:ncol,pver), thvs(:ncol), cam_in%cflx(:ncol,1), &
-           cam_in%shf(:ncol), rrho(:ncol), ustar(:ncol),  &
-           khfs(:ncol), kqfs(:ncol), kbfs(:ncol), obklen(:ncol))
+      thvs  (:ncol) = calc_virtual_temperature(th(:ncol,pver), state%q(:ncol,pver,1), zvir)
+      rrho  (:ncol) = calc_ideal_gas_rrho(rair, state%t(:ncol,pver), state%pmid(:ncol,pver))
+      ustar (:ncol) = calc_friction_velocity(cam_in%wsx(:ncol), cam_in%wsy(:ncol), rrho(:ncol))
+      khfs  (:ncol) = calc_kinematic_heat_flux(cam_in%shf(:ncol), rrho(:ncol), cpair)
+      kqfs  (:ncol) = calc_kinematic_water_vapor_flux(cam_in%cflx(:ncol,1), rrho(:ncol))
+      kbfs  (:ncol) = calc_kinematic_buoyancy_flux(khfs(:ncol), zvir, th(:ncol,pver), kqfs(:ncol))
+      obklen(:ncol) = calc_obukhov_length(thvs(:ncol), ustar(:ncol), gravit, karman, kbfs(:ncol))
       ! These tendencies all applied elsewhere.
       kvm = 0._r8
       kvh = 0._r8

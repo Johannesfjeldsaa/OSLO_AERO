@@ -156,6 +156,8 @@ contains
     use dyn_comp,           only: dyn_register
     use offline_driver,     only: offline_driver_reg
     use hemco_interface,    only: HCOI_Chunk_Init
+    use surface_emissions_mod, only: surface_emissions_reg
+    use elevated_emissions_mod, only: elevated_emissions_reg
 
     !---------------------------Local variables-----------------------------
     !
@@ -260,6 +262,9 @@ contains
        ! OSLO_AERO begin
        clim_modal_aero = .false.
        ! OSLO_AERO end
+
+       call surface_emissions_reg()
+       call elevated_emissions_reg()
 
        ! register chemical constituents including aerosols ...
        call chem_register()
@@ -372,7 +377,6 @@ contains
     type(file_desc_t), pointer :: fh_ini, fh_topo
     character(len=8) :: fieldname
     real(r8), pointer :: tptr(:,:), tptr_2(:,:), tptr3d(:,:,:), tptr3d_2(:,:,:)
-    real(r8), pointer :: qpert(:,:)
 
     character(len=11) :: subname='phys_inidat' ! subroutine name
     integer :: tpert_idx, qpert_idx, pblh_idx
@@ -461,21 +465,13 @@ contains
     qpert_idx = pbuf_get_index( 'qpert',ierr)
     if (qpert_idx > 0) then
        call infld(fieldname, fh_ini, dim1name, dim2name, 1, pcols, begchunk, endchunk, &
-            tptr, found, gridname='physgrid')
+            tptr(:,:), found, gridname='physgrid')
        if(.not. found) then
-          tptr=0_r8
+          tptr(:,:) = 0._r8
           if (masterproc) write(iulog,*) trim(fieldname), ' initialized to 0.'
        end if
 
-       allocate(tptr3d_2(pcols,pcnst,begchunk:endchunk), stat=ierr)
-       if (ierr /= 0) then
-          call endrun(subname//': Failed to allocate tptr3d_2(pcols,pcnst,begchunk:endchunk)')
-       end if
-       tptr3d_2 = 0_r8
-       tptr3d_2(:,1,:) = tptr(:,:)
-
-       call pbuf_set_field(pbuf2d, qpert_idx, tptr3d_2)
-       deallocate(tptr3d_2)
+       call pbuf_set_field(pbuf2d, qpert_idx, tptr)
     end if
 
     fieldname='CUSH'
@@ -750,7 +746,6 @@ contains
     use tracers,            only: tracers_init
     use aoa_tracers,        only: aoa_tracers_init
     use rayleigh_friction,  only: rayleigh_friction_init
-    use pbl_utils,          only: pbl_utils_init
     use vertical_diffusion, only: vertical_diffusion_init
     use phys_debug_util,    only: phys_debug_init
     use phys_debug,         only: phys_debug_state_init
@@ -777,6 +772,8 @@ contains
     use cam_history,        only: addfld, register_vector_field, add_default
     use cam_budget,         only: cam_budget_init
     use phys_grid_ctem,     only: phys_grid_ctem_init
+    use surface_emissions_mod, only: surface_emissions_init
+    use elevated_emissions_mod, only: elevated_emissions_init
 
     use ccpp_constituent_prop_mod, only: ccpp_const_props_init
 
@@ -864,6 +861,8 @@ contains
 
     ! initialize carma
     call carma_init(pbuf2d)
+    call surface_emissions_init(pbuf2d)
+    call elevated_emissions_init(pbuf2d)
 
     ! Prognostic chemistry.
     call chem_init(phys_state,pbuf2d)
@@ -889,7 +888,6 @@ contains
 
     call rayleigh_friction_init()
 
-    call pbl_utils_init(gravit, karman, cpair, rair, zvir)
     call vertical_diffusion_init(pbuf2d)
 
     if ( waccmx_is('ionosphere') .or. waccmx_is('neutral') ) then
@@ -2420,7 +2418,15 @@ contains
         tmp_trac(:ncol,:pver,:pcnst) = state%q(:ncol,:pver,:pcnst)
         tmp_pdel(:ncol,:pver)        = state%pdel(:ncol,:pver)
         tmp_ps(:ncol)                = state%ps(:ncol)
+        if (trim(cam_take_snapshot_before) == "physics_dme_adjust") then
+           call cam_snapshot_all_outfld_tphysac(cam_snapshot_before_num, state, tend, cam_in, cam_out, pbuf,&
+                      fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
+        end if
         call physics_dme_adjust(state, tend, qini, totliqini, toticeini, ztodt)
+        if (trim(cam_take_snapshot_after) == "physics_dme_adjust") then
+          call cam_snapshot_all_outfld_tphysac(cam_snapshot_after_num, state, tend, cam_in, cam_out, pbuf,&
+               fh2o, surfric, obklen, flx_heat, cmfmc, dlf, det_s, det_ice, net_flx)
+        end if
         call tot_energy_phys(state, 'phAM')
         call tot_energy_phys(state, 'dyAM', vc=vc_dycore)
         ! Restore pre-"physics_dme_adjust" tracers
@@ -2554,6 +2560,8 @@ contains
     use cam_snapshot,    only: cam_snapshot_all_outfld_tphysbc
     use cam_snapshot_common, only: cam_snapshot_ptend_outfld
     use dyn_tests_utils, only: vc_dycore
+    use surface_emissions_mod,only: surface_emissions_set
+    use elevated_emissions_mod,only: elevated_emissions_set
 
     ! Arguments
 
@@ -2769,6 +2777,10 @@ contains
     end if
 
     call t_stopf('energy_fixer')
+
+    call surface_emissions_set( lchnk, ncol, pbuf )
+    call elevated_emissions_set( lchnk, ncol, pbuf )
+
     !
     !===================================================
     ! Dry adjustment
@@ -2975,6 +2987,8 @@ subroutine phys_timestep_init(phys_state, cam_in, cam_out, pbuf2d)
   use nudging,             only: Nudge_Model, nudging_timestep_init
   use waccmx_phys_intr,    only: waccmx_phys_ion_elec_temp_timestep_init
   use phys_grid_ctem,      only: phys_grid_ctem_diags
+  use surface_emissions_mod,only: surface_emissions_adv
+  use elevated_emissions_mod,only: elevated_emissions_adv
   ! OSLO_AERO begin
   use oslo_aero_ocean,     only: oslo_aero_ocean_adv
   ! OSLO_AERO end
@@ -2998,6 +3012,8 @@ subroutine phys_timestep_init(phys_state, cam_in, cam_out, pbuf2d)
 
   ! Chemistry surface values
   call chem_surfvals_set()
+  call surface_emissions_adv(pbuf2d, phys_state)
+  call elevated_emissions_adv(pbuf2d, phys_state)
 
   ! Solar irradiance
   call solar_data_advance()
