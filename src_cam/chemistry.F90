@@ -56,7 +56,6 @@ module chemistry
    ! SFOM = SFOM_AI + SFOM_AC + SFOM_NI, which implies that we can use the aerosolType()
    ! SFSULFATE = SFSO4_PR, which implies using l_so4_pr
    ! SFSO2 = SFSO2, which implies that we can use the l_so2 index
-   real(r8), public, protected, allocatable :: SF_fields(:,:,:)
    real(r8), public, protected, allocatable :: SFBC(:,:)
    real(r8), public, protected, allocatable :: SFOM(:,:)
    real(r8), public, protected, allocatable :: SFSULFATE(:,:)

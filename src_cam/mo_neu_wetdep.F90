@@ -64,6 +64,7 @@ subroutine neu_wetdep_init
   ! OSLO_AERO begin
   use string_utils, only : int2str
   use ppgrid,       only : pcols, begchunk, endchunk
+  use phys_control, only : history_aerosol_base
   ! OSLO_AERO end
 !
   integer :: m,l
@@ -228,6 +229,17 @@ subroutine neu_wetdep_init
        call add_default('WD_'//trim(gas_wetdep_list(m)), 1, ' ')
     end if
   end do
+! OSLO_AERO begin
+  call addfld ('wet_SO2', horiz_only, 'A',  'kg/m2/s',   &
+    'SO2 wet deposition flux at surface.')
+  call addfld ('wet_SO2_S', horiz_only, 'A',  'kg*S/m2/s',   &
+    'SO2 wet deposition flux at surface, sulfur mass only.')
+
+  if ( history_aerosol_base ) then
+      call add_default( 'wet_SO2', 1, ' ' )
+      call add_default( 'wet_SO2_S', 1, ' ' )
+  end if
+! OSLO_AERO end
 !
   if ( do_diag ) then
     call addfld     ('QT_RAIN_HNO3',(/ 'lev' /), 'A','mol/mol/s','wet removal Neu scheme rain tendency')

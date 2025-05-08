@@ -494,25 +494,24 @@ contains
       !-----------------------------------------------------------------------
 
       sulfurMassFraction(:) = 0.0_r8
-      ! for dms the sulfur mass fraction is assumed ~32/62=M_S/M_DMS since DMS is CH3SCH3
+      ! DMS is CH3SCH3 so the sulfur mass fraction is assumed ~32/62=M_S/M_DMS
       sulfurMassFraction(l_dms) = 32.0_r8/62.0_r8
-      ! for msa the sulfur mass fraction is assumed ~32/96=M_S/M_MSA since MSA is CH3SO3H
-      !sulfur_mass_fraction() = 32.0_r8/96.0_r8
       ! for so2 the sulfur mass fraction is assumed ~1/1.998=M_S/M_SO2
       sulfurMassFraction(l_so2) = 1.0_r8/1.998_r8
       ! for sulfates the sulfur mass fraction is variable depending on the
       ! sulfate compound. For sulfate produced by aqueous-phase chemistry
-      ! the sulfur mass fraction is assumed ~1/3.59 since ...
+      ! the sulfur mass fraction is assumed to come from partly naturalised sulfates
+      ! The sulfur mass fraction is therefor assumed ~1/3.59 since = M_S/M_NH4HSO4
       sulfurMassFraction(l_so4_a2) = 1.0_r8/3.59_r8
-      ! for remaining sulfates the sulfur mass fraction is assumed ~1/3.06 since ...
+      ! for remaining sulfates the sulfur mass fraction is assumed ~1/3.06 = M_S / M_H2SO4
       sulfurMassFraction(l_so4_na) = 1.0_r8/3.06_r8
       sulfurMassFraction(l_so4_a1) = 1.0_r8/3.06_r8
       sulfurMassFraction(l_so4_ac) = 1.0_r8/3.06_r8
       sulfurMassFraction(l_so4_pr) = 1.0_r8/3.06_r8
-      ! for h2so4 the sulfur mass fraction is assumed ~1/3.06 since ...
+      ! for h2so4 the sulfur mass fraction is assumed ~1/3.06 = M_S / M_H2SO4
       sulfurMassFraction(l_h2so4) = 1.0_r8/3.06_r8
 
-      ! for msa the sulfur mass fraction is assumed ~32/96 since ...
+      ! for msa the sulfur mass fraction is assumed ~32/96 = M_S / M_CH3SO3H
       sulfurMassFraction_MSA = 32.0_r8/96.0_r8
 
    end subroutine sulfur_mass_fraction_register
@@ -525,9 +524,10 @@ contains
       ! can produce SOA.
       !-----------------------------------------------------------------------
 
-      ! for isoprene the SOA mass fraction is assumed ~168/136 since ...
+      ! SOA is given the proxy composition of C10H16O2  (so ~168g/mol)
+      ! Isoprene is C5H8 soa SOA mass fraction is assumed ~168/68=M_SOA/M_C5H8
       SOAyield_isoprene = 168.0_r8/68.0_r8
-      ! for monoterpenes the SOA mass fraction is assumed ~168/136 since ...
+      ! Monoterpene is C10H16 so SOA mass fraction is assumed ~168/136=M_SOA / M_C10H16
       SOAyield_monoterp = 168.0_r8/136.0_r8
 
    end subroutine soa_yield_register

@@ -999,17 +999,17 @@ contains
    ! add the wet deposition rate of the compound aerosols except sulfur to output
    do l_atype=1,N_AEROSOL_TYPES
       if ( l_atype /= AEROSOL_TYPE_SULFATE ) then
-         call outfld('wet_'//trim(aerosol_type_name(l_atype)), sflx_SFWET_arosol_type(:ncol,l_atype), ncol, lchnk)
+         call outfld('wet_'//trim(aerosol_type_name(l_atype)), -1.0_r8 * (sflx_SFWET_arosol_type(:ncol,l_atype)), ncol, lchnk)
       else if ( l_atype == AEROSOL_TYPE_SULFATE ) then
          ! Add in wd_a_h2so4 from het_diags (mo_chm_diags.F90)
          idx_wd_a_h2so4 = pbuf_get_index('WD_A_H2SO4')
          call pbuf_get_field(pbuf, idx_wd_a_h2so4, wd_a_h2so4)
 
          call outfld('wet_'//trim(aerosol_type_name(l_atype)),                &
-            ( sflx_SFWET_arosol_type(:ncol,l_atype) + wd_a_h2so4(:ncol) ),    &
+         -1.0_r8 * ( sflx_SFWET_arosol_type(:ncol,l_atype) + wd_a_h2so4(:ncol) ),    &
             ncol, lchnk)
          call outfld('wet_'//trim(aerosol_type_name(l_atype))//'_S',                                        &
-            ( sflx_SFWET_SULFATE_S(:ncol) + ( wd_a_h2so4(:ncol) * sulfurMassFraction(l_h2so4) )),     &
+            -1.0_r8 * ( sflx_SFWET_SULFATE_S(:ncol) + ( wd_a_h2so4(:ncol) * sulfurMassFraction(l_h2so4) )),     &
             ncol, lchnk)
          call outfld('wd_a_h2so4_debug', wd_a_h2so4(:ncol), ncol, lchnk)
       endif

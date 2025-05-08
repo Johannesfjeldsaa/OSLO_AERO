@@ -120,7 +120,7 @@ contains
     logical :: history_dust
     ! OSLO_AERO begin
     integer :: cloudTracerIndex_direct
-    integer :: l_aero, l_atype
+    integer :: l_atype
     integer :: astat
     character(len=20) :: cloudTracerName
     ! OSLO_AERO end
@@ -421,20 +421,6 @@ contains
        ! OSLO_AERO begin
        wetdep_name_area(m)='WD_A_'//trim(spc_name)
        call addfld( wetdep_name_area(m), horiz_only, 'A', 'kg/m2/s ', spc_name//' wet deposition' )
-
-       call cnst_get_ind(spc_name, l_aero, abort=.false.)
-       if ( l_aero == l_so2 ) then
-
-         call addfld ('wet_SO2', horiz_only, 'A',  'kg/m2/s',   &
-            'SO2 wet deposition flux at surface.')
-         call addfld ('wet_SO2_S', horiz_only, 'A',  'kg*S/m2/s',   &
-            'SO2 wet deposition flux at surface, sulfur mass only.')
-
-         if ( history_aerosol_base ) then
-            call add_default( 'wet_SO2', 1, ' ' )
-            call add_default( 'wet_SO2_S', 1, ' ' )
-         end if
-       end if
 
        !Needed for budget term of gases! Aerosols have their own budget terms
        if (n > 0) then
