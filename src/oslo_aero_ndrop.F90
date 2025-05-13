@@ -1404,13 +1404,11 @@ contains
     call outfld('NDROPMIX', ndropmix(:ncol,:), ncol, lchnk)
     call outfld('WTKE    ', wtke(:ncol,:),     ncol, lchnk)
 
-    if (history_aerosol) then
-       call ccncalc_oslo(state, pbuf, cs, hasAerosol, numberConcentration, volumeConcentration, &
-            hygroscopicity, lnSigma, ccn)
-       do l = 1, psat
-          call outfld(ccn_name(l), ccn(:,:,l), pcols, lchnk)
-       enddo
-    end if
+    call ccncalc_oslo(state, pbuf, cs, hasAerosol, numberConcentration, volumeConcentration, &
+       hygroscopicity, lnSigma, ccn)
+    do l = 1, psat
+       call outfld(ccn_name(l), ccn(:,:,l), pcols, lchnk)
+    enddo
 
     tendencyCounted(:)=.FALSE.
     do m = 1, ntot_amode

@@ -228,7 +228,7 @@ contains
                'vertically intergrated external forcing for '//trim(spc_name) )
           call addfld( trim(spc_name)//'_CMXF', horiz_only,  'A',  'kg/m2/s', &
                'vertically intergrated external forcing for '//trim(spc_name) )
-          if ( history_aerosol .or. history_chemistry .or. history_aerosol_decomposed) then 
+          if ( history_aerosol .or. history_chemistry .or. history_aerosol_decomposed) then
              call add_default( trim(spc_name)//'_CLXF', 1, ' ' )
              call add_default( trim(spc_name)//'_CMXF', 1, ' ' )
           endif
@@ -311,7 +311,7 @@ contains
        enddo
 
        ! Global attribute 'input_method' overrides the ext_frc_type namelist setting on
-       ! a file-by-file basis.  If the ext_frc file does not contain the 'input_method' 
+       ! a file-by-file basis.  If the ext_frc file does not contain the 'input_method'
        ! attribute then the ext_frc_type namelist setting is used.
        call pio_seterrorhandling(ncid, PIO_BCAST_ERROR)
        ierr = pio_get_att(ncid, PIO_GLOBAL, 'input_method', file_interp_type)

@@ -326,7 +326,6 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
 
   ! OSLO_AERO begin
   real(r8)    :: wrk_wd(pcols)
-  logical     :: history_aerosol
   integer     :: l_aero
   real(r8),                   pointer :: wd_a_h2so4(:)
   ! OSLO_AERO end
@@ -532,7 +531,6 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
 !This is output normally in mo_chm_diags, but
 !if neu wetdep, we have to output it here!
    ! OSLO_AERO begin
-   call phys_getopts( history_aerosol_out = history_aerosol)
    do m=1,gas_wetdep_cnt
       wrk_wd(:ncol) = 0.0_r8
       do k=1,pver
