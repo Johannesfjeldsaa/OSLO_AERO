@@ -21,6 +21,8 @@ module oslo_aero_share
   !---------------------------
 
   public :: aero_register           ! register consituents
+  public :: sulfur_mass_fraction_register
+  public :: soa_yield_register
   public :: is_process_mode         ! Check is an aerosol specie is a process mode
   public :: isAerosol               ! Check is specie is aerosol (i.e. gases get .FALSE. here)
   public :: getTracerIndex
@@ -245,6 +247,10 @@ module oslo_aero_share
   real(r8) :: osmoticCoefficient(pcnst)
   real(r8) :: numberOfIons(pcnst)
   real(r8) :: solubleMassFraction(pcnst)
+  real(r8) :: sulfurMassFraction(pcnst)
+  real(r8) :: sulfurMassFraction_MSA
+  real(r8) :: SOAyield_isoprene
+  real(r8) :: SOAyield_monoterp
   integer  :: aerosolType(pcnst)
   real(r8) :: numberFractionAvailableAqChem(nbmodes)
   real(r8) :: invrhopart(pcnst)
@@ -275,6 +281,7 @@ module oslo_aero_share
   integer :: l_dst_a2, l_dst_a3
   integer :: l_ss_a1, l_ss_a2, l_ss_a3, l_h2so4
   integer :: l_soa_na, l_soa_a1, l_soa_lv, l_soa_sv
+  integer :: l_so2, l_dms, l_monoterp, l_isoprene
 
   integer :: n_aerosol_tracers !number of aerosol tracers
   integer :: imozart
@@ -376,6 +383,12 @@ contains
 
     ! gas phase h2so4
     call cnst_get_ind('H2SO4'  ,l_h2so4, abort=.true.)
+
+    ! gas phase species
+    call cnst_get_ind('SO2'    ,l_so2,   abort=.true.) !sulfur dioxide
+    call cnst_get_ind('DMS'    ,l_dms,   abort=.true.) !dimethyl sulfide
+    call cnst_get_ind('monoterp'  ,l_monoterp, abort=.true.) !monoterpenes
+    call cnst_get_ind('isoprene'  ,l_isoprene, abort=.true.) !isoprene
 
     ! Register the tracers in modes
     call registerTracersInMode()
@@ -479,6 +492,54 @@ contains
     call inittabrh
 
   end subroutine aero_register
+
+   !===============================================================================
+
+   subroutine sulfur_mass_fraction_register
+      !-----------------------------------------------------------------------
+      ! Register the sulfur mass fraction for the different tracers
+      ! where sulfur is present. Both for the aerosol tracers and the
+      ! gas phase tracers.
+      !-----------------------------------------------------------------------
+
+      sulfurMassFraction(:) = 0.0_r8
+      ! DMS is CH3SCH3 so the sulfur mass fraction is assumed ~32/62=M_S/M_DMS
+      sulfurMassFraction(l_dms) = 32.0_r8/62.0_r8
+      ! for so2 the sulfur mass fraction is assumed ~1/1.998=M_S/M_SO2
+      sulfurMassFraction(l_so2) = 1.0_r8/1.998_r8
+      ! for sulfates the sulfur mass fraction is variable depending on the
+      ! sulfate compound. For sulfate produced by aqueous-phase chemistry
+      ! the sulfur mass fraction is assumed to come from partly naturalised sulfates
+      ! The sulfur mass fraction is therefor assumed ~1/3.59 since = M_S/M_NH4HSO4
+      sulfurMassFraction(l_so4_a2) = 1.0_r8/3.59_r8
+      ! for remaining sulfates the sulfur mass fraction is assumed ~1/3.06 = M_S / M_H2SO4
+      sulfurMassFraction(l_so4_na) = 1.0_r8/3.06_r8
+      sulfurMassFraction(l_so4_a1) = 1.0_r8/3.06_r8
+      sulfurMassFraction(l_so4_ac) = 1.0_r8/3.06_r8
+      sulfurMassFraction(l_so4_pr) = 1.0_r8/3.06_r8
+      ! for h2so4 the sulfur mass fraction is assumed ~1/3.06 = M_S / M_H2SO4
+      sulfurMassFraction(l_h2so4) = 1.0_r8/3.06_r8
+
+      ! for msa the sulfur mass fraction is assumed ~32/96 = M_S / M_CH3SO3H
+      sulfurMassFraction_MSA = 32.0_r8/96.0_r8
+
+   end subroutine sulfur_mass_fraction_register
+
+   !===============================================================================
+
+   subroutine soa_yield_register
+      !-----------------------------------------------------------------------
+      ! Register the SOA yield for the different tracers which
+      ! can produce SOA.
+      !-----------------------------------------------------------------------
+
+      ! SOA is given the proxy composition of C10H16O2  (so ~168g/mol)
+      ! Isoprene is C5H8 soa SOA mass fraction is assumed ~168/68=M_SOA/M_C5H8
+      SOAyield_isoprene = 168.0_r8/68.0_r8
+      ! Monoterpene is C10H16 so SOA mass fraction is assumed ~168/136=M_SOA / M_C10H16
+      SOAyield_monoterp = 168.0_r8/136.0_r8
+
+   end subroutine soa_yield_register
 
   !=============================================================================
   function getNumberOfAerosolTracers()RESULT(numberOfTracers)
