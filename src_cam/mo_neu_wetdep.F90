@@ -34,6 +34,10 @@ module mo_neu_wetdep
   integer                     :: so4_ndx,so4s_ndx ! geos-chem
   logical                     :: debug   = .false.
   integer                     :: hno3_ndx = 0
+  ! OSLO_AERO begin
+  real(r8), public, protected, allocatable   :: WD_A_SO2_NEU(:,:)
+  integer                                    :: idx_wd_a_h2so4 = -1
+  ! OSLO_AERO end
 !
 ! diagnostics
 !
@@ -57,11 +61,19 @@ subroutine neu_wetdep_init
   use constituents, only : cnst_get_ind,cnst_mw
   use cam_history,  only : addfld, add_default, horiz_only
   use phys_control, only : phys_getopts, cam_chempkg_is
+  ! OSLO_AERO begin
+  use string_utils, only : int2str
+  use ppgrid,       only : pcols, begchunk, endchunk
+  use phys_control, only : history_aerosol_base
+  ! OSLO_AERO end
 !
   integer :: m,l
   character*20 :: test_name
 
   logical :: history_chemistry
+  ! OSLO_AERO begin
+  integer :: astat
+  ! OSLO_AERO end
 
   call phys_getopts(history_chemistry_out=history_chemistry)
 
@@ -73,6 +85,14 @@ subroutine neu_wetdep_init
   allocate( mapping_to_mmr(gas_wetdep_cnt) )
   allocate( ice_uptake(gas_wetdep_cnt) )
   allocate( mol_weight(gas_wetdep_cnt) )
+
+  ! OSLO_AERO begin
+  allocate( WD_A_SO2_NEU(pcols, begchunk:endchunk), stat=astat )
+  if( astat/= 0 ) then
+    call endrun('neu_wetdep_init: failed to allocate WD_A_SO2 array; error = '//int2str(astat))
+  end if
+  WD_A_SO2_NEU(:,:) = 0.0_r8
+  ! OSLO_AERO end
 
 !
 ! find mapping to heff table
@@ -207,6 +227,17 @@ subroutine neu_wetdep_init
     end if
   end do
 !
+! OSLO_AERO begin
+  call addfld ('wet_SO2', horiz_only, 'A',  'kg/m2/s',   &
+    'SO2 wet deposition flux at surface.')
+  call addfld ('wet_SO2_S', horiz_only, 'A',  'kg*S/m2/s',   &
+    'SO2 wet deposition flux at surface, sulfur mass only.')
+
+  if ( history_aerosol_base ) then
+      call add_default( 'wet_SO2', 1, ' ' )
+      call add_default( 'wet_SO2_S', 1, ' ' )
+  end if
+! OSLO_AERO end
   if ( do_diag ) then
     call addfld     ('QT_RAIN_HNO3',(/ 'lev' /), 'A','mol/mol/s','wet removal Neu scheme rain tendency')
     call addfld     ('QT_RIME_HNO3',(/ 'lev' /), 'A','mol/mol/s','wet removal Neu scheme rain tendency')
@@ -225,13 +256,22 @@ subroutine neu_wetdep_init
 end subroutine neu_wetdep_init
 !
 subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
-     prain, nevapr, cld, cmfdqr, wd_tend, wd_tend_int)
+     prain, nevapr, cld, cmfdqr, wd_tend, wd_tend_int,              &
+     pbuf                                                           & ! OSLO_AERO
+     )
 !
   use ppgrid,           only : pcols, pver
   use phys_grid,        only : get_area_all_p, get_rlat_all_p
   use shr_const_mod,    only : SHR_CONST_REARTH,SHR_CONST_G
   use cam_history,      only : outfld
   use shr_const_mod,    only : pi => shr_const_pi
+  ! OSLO_AERO begin
+  use oslo_aero_share,  only : sulfurMassFraction
+  use oslo_aero_share,  only : l_so2, l_h2so4
+  use physics_buffer,   only : physics_buffer_desc, pbuf_get_field, pbuf_get_index
+  use constituents,     only : cnst_get_ind
+  use mo_tracname,      only : solsym
+  ! OSLO_AERO end
 !
   implicit none
 !
@@ -249,6 +289,9 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
   real(r8),       intent(in)    :: cmfdqr(ncol, pver)
   real(r8),       intent(inout) :: wd_tend(pcols,pver,pcnst)
   real(r8),       intent(inout) :: wd_tend_int(pcols,pcnst)
+  ! OSLO_AERO begin
+  type(physics_buffer_desc),  pointer :: pbuf(:)
+  ! OSLO_AERO end
 !
 ! local arrays and variables
 !
@@ -275,9 +318,12 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
   real(r8)                  :: e298, dhr
   real(r8), dimension(ncol) :: dk1s,dk2s,wrk
   real(r8) :: lats(pcols)
-  real(r8) :: wrk_wd(pcols)   ! OSLO_AERO
-  logical  :: history_aerosol ! OSLO_AERO
   real(r8), parameter :: rad2deg = 180._r8/pi
+  ! OSLO_AERO begin
+  real(r8)            :: wrk_wd(pcols)
+  integer             :: l_aero
+  real(r8), pointer   :: wd_a_h2so4(:)
+  ! OSLO_AERO end
 !
 ! from cam/src/physics/cam/stratiform.F90
 !
@@ -291,6 +337,7 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
 ! reset output variables
 !
    wd_tend_int = 0._r8
+   WD_A_SO2_NEU(:ncol,lchnk) = 0._r8 ! OSLO_AERO
 !
 ! get area (in radians square)
 !
@@ -477,17 +524,37 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
 !
   ! OSLO_AERO begin
   !This is output normally in mo_chm_diags, but if neu wetdep, we have to output it here!
-  call phys_getopts( history_aerosol_out = history_aerosol)
-  if (history_aerosol) then
-     do m=1,gas_wetdep_cnt
-        wrk_wd(:ncol) = 0.0_r8
-        do k=1,pver
-           !Note sign: tendency is negative, so this becomes a positive flux!
-           wrk_wd(:ncol) = wrk_wd(:ncol) - wd_tend(1:ncol,k,mapping_to_mmr(m))*pdel(:ncol,k)*rgrav !kg/m2/sec
-        end do
-        call outfld('WD_A_'//trim(gas_wetdep_list(m)),wrk_wd(:ncol),ncol,lchnk)
-     end do
-  end if
+  do m=1,gas_wetdep_cnt
+    wrk_wd(:ncol) = 0.0_r8
+    do k=1,pver
+        !Note sign: tendency is negative, so this becomes a positive flux!
+        wrk_wd(:ncol) = wrk_wd(:ncol) - wd_tend(1:ncol,k,mapping_to_mmr(m))*pdel(:ncol,k)*rgrav !kg/m2/sec
+    end do
+
+    ! get the index of the gas species that coresponds to the l_spcies system
+    call cnst_get_ind(trim(gas_wetdep_list(m)), l_aero, abort=.false.)
+
+    call outfld('WD_A_'//trim(gas_wetdep_list(m)),wrk_wd(:ncol),ncol,lchnk)
+
+    if ( l_aero == l_so2 ) then
+
+      call outfld('wet_SO2', wrk_wd(:ncol), ncol, lchnk)
+      call outfld('wet_SO2_S', ( wrk_wd(:ncol) * sulfurMassFraction(l_so2) ), ncol, lchnk)
+
+      WD_A_SO2_NEU(:ncol,lchnk) = WD_A_SO2_NEU(:ncol,lchnk) + wrk_wd(:ncol)
+    endif
+
+    ! Save the WD_A field to the wd_a_h2so4 pointer if l_aero == l_h2so4
+    ! this field is passed to the pbuf
+    if (l_aero == l_h2so4) then
+
+      idx_wd_a_h2so4 = pbuf_get_index('WD_A_H2SO4')
+
+      call pbuf_get_field(pbuf, idx_wd_a_h2so4, wd_a_h2so4)
+      wd_a_h2so4(:ncol) = wrk_wd(:ncol)
+    end if
+
+  end do
   ! OSLO_AERO end
 
 
