@@ -461,13 +461,6 @@ contains
          call cnst_get_ind(trim(extfrc_lst(n)), l_aero, abort=.false.)
          if ( l_aero == l_bc_ax .or. l_aero == l_bc_ni .or. l_aero == l_bc_n .or. &
             l_aero == l_om_ni .or. l_aero == l_so2 .or. l_aero == l_so4_pr ) then
-            if ( masterproc ) then
-               write(iulog,*) 'extfrc_set: adding forcing for ',trim(extfrc_lst(n)), &
-                  'l_aero = ',l_aero,', l_bc_ax = ',l_bc_ax, &
-                  ', l_bc_ni = ',l_bc_ni,', l_bc_n = ', l_bc_n, &
-                  ', l_om_ni = ',l_om_ni, &
-                  ', l_so2 = ',l_so2,', l_so4_pr = ',l_so4_pr
-            end if
             ! add the forcing to the CMXF_fields array
             CMXF_fields(:ncol,l_aero,lchnk) = CMXF_fields(:ncol,l_aero,lchnk) + frcing_col_kg(:ncol)
          end if

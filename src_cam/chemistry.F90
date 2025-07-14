@@ -1812,7 +1812,6 @@ subroutine summation_fields_writeout(lchnk, ncol)
    ! -----------------------------------------------------------------------
 
    ! emis_SO2
-   if ( masterproc ) write(iulog,*) 'chemistry: attempting to access CMXF value for SO2 at index l_so2', l_so2
    emis_SO2(:ncol) = SFSO2(:ncol, lchnk) + CMXF_fields(:ncol, l_so2, lchnk)
    emis_SO2_S(:ncol) = ( SFSO2(:ncol, lchnk) + CMXF_fields(:ncol, l_so2, lchnk) ) * sulfurMassFraction(l_so2)
    ! sour_SO2
@@ -1839,7 +1838,6 @@ subroutine summation_fields_writeout(lchnk, ncol)
    ! -----------------------------------------------------------------------
 
    ! emis_SULFATE
-   if ( masterproc ) write(iulog,*) 'chemistry: attempting to access CMXF value for SULFATE at index l_so4_pr', l_so4_pr
    emis_SULFATE(:ncol) = SFSULFATE(:ncol, lchnk) + CMXF_fields(:ncol,l_so4_pr,lchnk)
    ! emis_SULFATE_S, sulfur mass only
    emis_SULFATE_S(:ncol) = ( SFSULFATE(:ncol, lchnk) + CMXF_fields(:ncol,l_so4_pr,lchnk) ) * sulfurMassFraction(l_so4_pr)
@@ -1858,10 +1856,6 @@ subroutine summation_fields_writeout(lchnk, ncol)
    !     emis_BC
    ! -----------------------------------------------------------------------
    ! emis_BC
-   if ( masterproc ) write(iulog,*) 'chemistry: attempting to access CMXF value for BC at index l_bc_ax', l_bc_ax, &
-      'l_bc_n', l_bc_n, 'l_bc_ni', l_bc_ni
-
-   !emis_BC(:ncol) = SFBC(:ncol, lchnk) + BC_CMXF(:ncol, lchnk)
    emis_BC(:ncol) = SFBC(:ncol, lchnk)                   + &
                      CMXF_fields(:ncol, l_bc_ax, lchnk)  + &
                      CMXF_fields(:ncol, l_bc_n, lchnk)   + &
@@ -1873,7 +1867,6 @@ subroutine summation_fields_writeout(lchnk, ncol)
    !     sour_OM
    ! -----------------------------------------------------------------------
    ! emis_OM
-   if ( masterproc ) write(iulog,*) 'chemistry: attempting to access CMXF value for OM at index l_om_ni', l_om_ni
    emis_OM(:ncol) = SFOM(:ncol, lchnk) + CMXF_fields(:ncol,l_om_ni,lchnk)
    ! sour_OM
    sour_OM(:ncol) = emis_OM(:ncol) + GS_SOA(:ncol,lchnk)
