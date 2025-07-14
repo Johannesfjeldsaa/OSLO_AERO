@@ -14,6 +14,10 @@ module mo_extfrc
   use tracer_data,   only : trfld,trfile
   use mo_constants,  only : avogadro
   use ioFileMod,     only : getfil
+  ! OSLO_AERO begin
+  use constituents,  only : pcnst
+  use ppgrid,        only : pcols, begchunk, endchunk
+  ! OSLO_AERO end
 
   implicit none
 
@@ -41,6 +45,14 @@ module mo_extfrc
 
   type(forcing), allocatable  :: forcings(:)
   integer :: n_frc_files = 0
+  ! OSLO_AERO begin
+  ! CMXF summations used for emission fields summed in oslo_aero_share.F90-summation_fields_writeout()
+  ! BC_CMXF = BC_AX_XMCF + BC_NI_CMXF + BC_N_CMXF, we use l_bc_ax, l_bc_ni, l_bc_n for logic
+  ! OM_NI_CMXF = OM_NI_CMXF, we use l_om_ni for logic
+  ! SO2_CMXF = SO2_CMXF, we use l_so2 for logic
+  ! SO4_PR_CMXF = SO4_PR_CMXF, we use l_so4_pr for logic
+  real(r8), public, protected, allocatable   :: CMXF_fields(:,:,:)
+  ! OSLO_AERO end
 
 contains
 
@@ -60,6 +72,10 @@ contains
     use phys_control,  only : phys_getopts
     use string_utils,  only : GLC
     use m_MergeSorts,  only : IndexSort
+    ! OSLO_AERO begin
+    use phys_control,  only : history_aerosol_decomposed
+    use string_utils,  only : int2str
+    ! OSLO_AERO end
 
     implicit none
 
@@ -178,6 +194,17 @@ contains
        call endrun('extfrc_inti: failed to allocate forcings array')
     end if
 
+   ! OSLO_AERO begin
+   !-----------------------------------------------------------------------
+   ! 	... allocate  array for CMXF data transfer
+   !-----------------------------------------------------------------------
+   allocate( CMXF_fields(pcols, pcnst, begchunk:endchunk), stat=astat )
+   if( astat/= 0 ) then
+      call endrun('extfrc_inti: failed to allocate CMXF_fields array; error = '//int2str(astat))
+   end if
+   CMXF_fields(:,:,:) = 0.0_r8
+   ! OSLO_AERO end
+
     !-----------------------------------------------------------------------
     ! Sort the input files so that the emissions sources are summed in the
     ! same order regardless of the order of the input files in the namelist
@@ -205,7 +232,7 @@ contains
                'vertically intergrated external forcing for '//trim(spc_name) )
           call addfld( trim(spc_name)//'_CMXF', horiz_only,  'A',  'kg/m2/s', &
                'vertically intergrated external forcing for '//trim(spc_name) )
-          if ( history_aerosol .or. history_chemistry ) then
+          if ( history_aerosol .or. history_chemistry .or. history_aerosol_decomposed) then
              call add_default( trim(spc_name)//'_CLXF', 1, ' ' )
              call add_default( trim(spc_name)//'_CMXF', 1, ' ' )
           endif
@@ -364,7 +391,10 @@ contains
     !--------------------------------------------------------
     !	... form the external forcing
     !--------------------------------------------------------
-    use mo_chem_utls,  only : get_spc_ndx
+    use mo_chem_utls,      only : get_spc_ndx
+    ! OSLO_AERO begin
+    use constituents,      only : cnst_get_ind
+    use oslo_aero_share,   only : l_bc_ax, l_bc_ni, l_bc_n, l_om_ni, l_so2, l_so4_pr
 
     implicit none
 
@@ -388,12 +418,14 @@ contains
     real(r8),parameter :: kg_to_g = 1.e-3_r8
     real(r8) :: molec_to_kg
     integer  :: spc_ndx
+    integer  :: l_aero     ! OSLO_AERO
 
     if( n_frc_files < 1 .or. extcnt < 1 ) then
        return
     end if
 
     frcing(:,:,:) = 0._r8
+    CMXF_fields(:ncol,:,lchnk) = 0.0_r8 ! OSLO_AERO
 
     !--------------------------------------------------------
     !	... set non-zero forcings
@@ -423,6 +455,23 @@ contains
              frcing_col(:ncol) = frcing_col(:ncol) + frcing(:ncol,k,n)*(zint(:ncol,k)-zint(:ncol,k+1))*km_to_cm
              frcing_col_kg(:ncol) = frcing_col_kg(:ncol) + frcing(:ncol,k,n)*(zint(:ncol,k)-zint(:ncol,k+1))*km_to_cm*molec_to_kg
           enddo
+
+         !OSLO_AERO begin
+         ! get the index of the forcing index that coresponds to the l_spc system
+         call cnst_get_ind(trim(extfrc_lst(n)), l_aero, abort=.false.)
+         if ( l_aero == l_bc_ax .or. l_aero == l_bc_ni .or. l_aero == l_bc_n .or. &
+            l_aero == l_om_ni .or. l_aero == l_so2 .or. l_aero == l_so4_pr ) then
+            if ( masterproc ) then
+               write(iulog,*) 'extfrc_set: adding forcing for ',trim(extfrc_lst(n)), &
+                  'l_aero = ',l_aero,', l_bc_ax = ',l_bc_ax, &
+                  ', l_bc_ni = ',l_bc_ni,', l_bc_n = ', l_bc_n, &
+                  ', l_om_ni = ',l_om_ni, &
+                  ', l_so2 = ',l_so2,', l_so4_pr = ',l_so4_pr
+            end if
+            ! add the forcing to the CMXF_fields array
+            CMXF_fields(:ncol,l_aero,lchnk) = CMXF_fields(:ncol,l_aero,lchnk) + frcing_col_kg(:ncol)
+         end if
+         !OSLO_AERO end
 
           xfcname = trim(extfrc_lst(n))//'_CLXF'
           call outfld( xfcname, frcing_col(:ncol), ncol, lchnk )
