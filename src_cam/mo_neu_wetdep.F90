@@ -238,6 +238,7 @@ subroutine neu_wetdep_init
       call add_default( 'wet_SO2_S', 1, ' ' )
   end if
 ! OSLO_AERO end
+
   if ( do_diag ) then
     call addfld     ('QT_RAIN_HNO3',(/ 'lev' /), 'A','mol/mol/s','wet removal Neu scheme rain tendency')
     call addfld     ('QT_RIME_HNO3',(/ 'lev' /), 'A','mol/mol/s','wet removal Neu scheme rain tendency')
@@ -255,8 +256,10 @@ subroutine neu_wetdep_init
 !
 end subroutine neu_wetdep_init
 !
-subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
-     prain, nevapr, cld, cmfdqr, wd_tend, wd_tend_int )
+subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt,   &
+     prain, nevapr, cld, cmfdqr, wd_tend, wd_tend_int,                &
+     pbuf                                                             & ! OSLO_AERO
+     )
 !
   use ppgrid,           only : pcols, pver
   use phys_grid,        only : get_area_all_p, get_rlat_all_p
@@ -266,7 +269,7 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
   ! OSLO_AERO begin
   use oslo_aero_share,  only : sulfurMassFraction
   use oslo_aero_share,  only : l_so2, l_h2so4
-  !use physics_buffer,   only : physics_buffer_desc, pbuf_get_field, pbuf_get_index
+  use physics_buffer,   only : physics_buffer_desc, pbuf_get_field, pbuf_get_index
   use constituents,     only : cnst_get_ind
   use mo_tracname,      only : solsym
   ! OSLO_AERO end
@@ -288,7 +291,7 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
   real(r8),       intent(inout) :: wd_tend(pcols,pver,pcnst)
   real(r8),       intent(inout) :: wd_tend_int(pcols,pcnst)
   ! OSLO_AERO begin
-  !type(physics_buffer_desc),  pointer :: pbuf(:)
+  type(physics_buffer_desc),  pointer :: pbuf(:)
   ! OSLO_AERO end
 !
 ! local arrays and variables
@@ -536,6 +539,9 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
 
     if ( l_aero == l_so2 ) then
 
+      if ( masterproc ) write(iulog,*) 'OSLO_AERO, mo_neu_wetdep, line 546: l_aero = l_so2, outputting wet_SO2 and wet_SO2_S', &
+        'gas_wetdep_list(m) = ', trim(gas_wetdep_list(m))
+
       call outfld('wet_SO2', wrk_wd(:ncol), ncol, lchnk)
       call outfld('wet_SO2_S', ( wrk_wd(:ncol) * sulfurMassFraction(l_so2) ), ncol, lchnk)
 
@@ -544,13 +550,21 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt, &
 
     ! Save the WD_A field to the wd_a_h2so4 pointer if l_aero == l_h2so4
     ! this field is passed to the pbuf
-    !if (l_aero == l_h2so4) then
-!
-    !  idx_wd_a_h2so4 = pbuf_get_index('WD_A_H2SO4')
-!
-    !  call pbuf_get_field(pbuf, idx_wd_a_h2so4, wd_a_h2so4)
-    !  wd_a_h2so4(:ncol) = wrk_wd(:ncol)
-    !end if
+    if (l_aero == l_h2so4) then
+
+      if ( masterproc ) write(iulog,*) 'OSLO_AERO, mo_neu_wetdep, line 559: l_aero = l_h2so4, outputting wd_a_h2so4', &
+        ' to the pbuf gas_wetdep_list(m) = ', trim(gas_wetdep_list(m))
+
+      idx_wd_a_h2so4 = pbuf_get_index('WD_A_H2SO4')
+
+      if ( masterproc ) write(iulog,*) 'OSLO_AERO, mo_neu_wetdep, line 564: idx_wd_a_h2so4 = ', idx_wd_a_h2so4
+      call pbuf_get_field(pbuf, idx_wd_a_h2so4, wd_a_h2so4)
+      if ( masterproc ) write(iulog,*) 'OSLO_AERO, mo_neu_wetdep, line 567: pbuf_get_field for wd_a_h2so4 done', &
+        ' idx_wd_a_h2so4 = ', idx_wd_a_h2so4, ' wd_a_h2so4 size = ', size(wd_a_h2so4)
+
+      wd_a_h2so4(:ncol) = wrk_wd(:ncol)
+      if ( masterproc ) write(iulog,*) 'OSLO_AERO, mo_neu_wetdep, line 569: write wrk_wd to wd_a_h2so4(:ncol)'
+    end if
 
   end do
   ! OSLO_AERO end
