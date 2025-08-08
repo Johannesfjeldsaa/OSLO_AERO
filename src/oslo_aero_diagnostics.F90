@@ -19,9 +19,12 @@ contains
       character(len=20) :: varname
 
       call addfld ('AODVIS  ',horiz_only,  'A','unitless' ,'Aerosol optical depth at 0.442-0.625um') ! CAM4-Oslo: 0.35-0.64um
-      call addfld ('ABSVIS  ',horiz_only,  'A','unitless' ,'Aerosol absorptive optical depth at 0.442-0.625um') ! CAM4-Oslo: 0.35-0.64um
-      call addfld ('AODVVOLC ',horiz_only, 'A','unitless' ,'CMIP6 volcanic aerosol optical depth at 0.442-0.625um') ! CAM4-Oslo: 0.35-0.64um
-      call addfld ('ABSVVOLC ',horiz_only, 'A','unitless' ,'CMIP6 volcanic aerosol absorptive optical depth at 0.442-0.625um') ! CAM4-Oslo: 0.35-0.64um
+       ! value for ABSVIS in CAM4-Oslo: 0.35-0.64um
+      call addfld ('ABSVIS  ',horiz_only,  'A','unitless' ,'Aerosol absorptive optical depth at 0.442-0.625um')
+      ! value for AODVVOLC in CAM4-Oslo: 0.35-0.64um
+      call addfld ('AODVVOLC ',horiz_only, 'A','unitless' ,'CMIP6 volcanic aerosol optical depth at 0.442-0.625um')
+      ! valud or ABSVVOLC in CAM4-Oslo: 0.35-0.64um
+      call addfld ('ABSVVOLC ',horiz_only, 'A','unitless' ,'CMIP6 volcanic aerosol absorptive optical depth at 0.442-0.625um')
       call addfld ('CAODVIS ',horiz_only,  'A','unitless' ,'Clear air aerosol optical depth')
       call addfld ('CABSVIS ',horiz_only,  'A','unitless' ,'Clear air aerosol absorptive optical depth')
       call addfld ('CLDFREE ',horiz_only,  'A','unitless' ,'Cloud free fraction wrt CAODVIS and CABSVIS')
@@ -59,7 +62,6 @@ contains
          call add_default ('CAODVIS ', 1, ' ')
          call add_default ('CABSVIS ', 1, ' ')
          call add_default ('CLDFREE ', 1, ' ')
-      !call add_default ('N_AERORG', 1, ' ')
          call add_default ('SSAVIS  ', 1, ' ')
          call add_default ('ASYMMVIS', 1, ' ')
          call add_default ('EXTVIS  ', 1, ' ')

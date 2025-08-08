@@ -869,7 +869,7 @@ end function chem_is_active
                call addfld('emis_'//trim(sflxnam(n)(3:)), horiz_only, 'A', 'kg/m2/s', &
                      trim(sflxnam(n)(3:))//' emissions')
                if ( n == l_dms ) then
-                  call addfld('emis_'//trim(sflxnam(n)(3:))//'_S', horiz_only, 'A', 'kg*S/m2/s', &
+                  call addfld('emis_'//trim(sflxnam(n)(3:))//'_S', horiz_only, 'A', 'kg/m2/s', &
                      trim(sflxnam(n)(3:))//' emissions, sulfur mass only')
                endif
 
@@ -1580,54 +1580,40 @@ end function chem_is_active
    ! Initialisation of fields, orderered as in DESCRIPTION
    ! -----------------------------------------------------------------------
    ! DMS
-   call addfld ('chloss_DMS_S', horiz_only, 'A',  'kg*S/m2/s',   &
+   call addfld ('chloss_DMS_S', horiz_only, 'A',  'kg/m2/s',             &
       'Chemical loss of DMS, sulfur mass only.')
-   call addfld ('chlossg_DMS_S', horiz_only, 'A',  'kg*S/m2/s',   &
+   call addfld ('chlossg_DMS_S', horiz_only, 'A',  'kg/m2/s',            &
       'Chemical loss of DMS as gas, sulfur mass only.')
    ! SO2
-   call addfld ('emis_SO2', horiz_only, 'A',  'kg/m2/s',   &
+   call addfld ('emis_SO2', horiz_only, 'A',  'kg/m2/s',                 &
       'SO2 emission.')
-   call addfld ('emis_SO2_S', horiz_only, 'A',  'kg*S/m2/s',   &
+   call addfld ('emis_SO2_S', horiz_only, 'A',  'kg/m2/s',               &
       'SO2 emission, sulfur mass only.')
-   call addfld ('sour_SO2_S', horiz_only, 'A',  'kg*S/m2/s',   &
+   call addfld ('sour_SO2_S', horiz_only, 'A',  'kg/m2/s',               &
       'SO2 source, sulfur mass only.')
-   call addfld ('sink_SO2_S', horiz_only, 'A',  'kg*S/m2/s',   &
+   call addfld ('sink_SO2_S', horiz_only, 'A',  'kg/m2/s',               &
       'SO2 sink, sulfur mass only.')
-   call addfld ('chloss_SO2_S', horiz_only, 'A',  'kg*S/m2/s',   &
+   call addfld ('chloss_SO2_S', horiz_only, 'A',  'kg/m2/s',             &
       'Chemical loss of SO2, sulfur mass only.')
-   call addfld ('chlossg_SO2_S', horiz_only, 'A',  'kg*S/m2/s',   &
+   call addfld ('chlossg_SO2_S', horiz_only, 'A',  'kg/m2/s',            &
       'Chemical loss of SO2 as gas, sulfur mass only.')
    ! SULFATE
-   call addfld ('emis_SULFATE', horiz_only, 'A',  'kg/m2/s',   &
+   call addfld ('emis_SULFATE', horiz_only, 'A',  'kg/m2/s',             &
       'SULFATE emission.')
-   call addfld ('emis_SULFATE_S', horiz_only, 'A',  'kg*S/m2/s',   &
+   call addfld ('emis_SULFATE_S', horiz_only, 'A',  'kg/m2/s',           &
       'SULFATE emission, sulfur mass only.')
-   call addfld ('sour_SULFATE', horiz_only, 'A',  'kg/m2/s',   &
+   call addfld ('sour_SULFATE', horiz_only, 'A',  'kg/m2/s',             &
       'SULFATE source.')
-   call addfld ('sour_SULFATE_S', horiz_only, 'A',  'kg*S/m2/s',   &
+   call addfld ('sour_SULFATE_S', horiz_only, 'A',  'kg/m2/s',           &
       'SULFATE source, sulfur mass only.')
    ! BC
-   call addfld ('emis_BC', horiz_only, 'A',  'kg/m2/s',   &
+   call addfld ('emis_BC', horiz_only, 'A',  'kg/m2/s',                  &
       'BC emission.')
    ! OM
-   call addfld ('emis_OM', horiz_only, 'A',  'kg/m2/s',   &
+   call addfld ('emis_OM', horiz_only, 'A',  'kg/m2/s',                  &
       'OM emission.')
-   call addfld ('sour_OM', horiz_only, 'A',  'kg/m2/s',   &
+   call addfld ('sour_OM', horiz_only, 'A',  'kg/m2/s',                  &
       'OM source.')
-
-   ! TEMPORARY FIELDS
-   call addfld ('tot_dms_lost_as_S', horiz_only, 'A',  'kg/m2/s',   &
-      'tmp field, REMOVE BFR PR.')
-   call addfld ('msa_prod_from_dms_as_S', horiz_only, 'A',  'kg/m2/s',   &
-   'tmp field, REMOVE BFR PR.')
-   call addfld ('SO2_formed_from_DMS_as_S', horiz_only, 'A',  'kg/m2/s',   &
-      'tmp field, REMOVE BFR PR.')
-
-   if ( history_aerosol_debug_output ) then
-      call add_default('tot_dms_lost_as_S', 1, ' ')
-      call add_default('SO2_formed_from_DMS_as_S', 1, ' ')
-      call add_default('msa_prod_from_dms_as_S', 1, ' ')
-   endif
 
    if ( history_aerosol_base ) then
       ! SO2
@@ -1771,20 +1757,15 @@ subroutine summation_fields_writeout(lchnk, ncol)
    sour_OM(:) = 0._r8
 
    ! calculate summations that is used across tracer species
-   ! SO2_formed_from_DMS_as_S = tot_dms_lost_as_S - msa_prod_from_dms_as_S
-   !     tot_dms_lost_as_S = - GS_DMS * sulfurMassFraction(l_dms)
-   !     msa_prod_from_dms_as_S = sulfurMassFraction_MSA * (
-   !         GS_SOA_LV + GS_SOA_SV - ( -1.0 ( 0.05*SOAyield_isoprene*GS_isoprene + 0.15*SOAyield_monoterp*GS_monoterp ) )
-   !     )
-   !         NOTE: The 0.005 and 0.15 are tuning factors - i.e. "magic numbers". Per 2024-04.08 these are in sync with the
-   !         chem_mech document (NorESM/components/cam/src/chemistry/pp_trop_mam_oslo/chem_mech.doc) line 109-111
-   !         (monoterp = 0.15) and line 112-114 (isoprene = 0.005).
+   ! NOTE: The 0.005 and 0.15 are tuning factors - i.e. "magic numbers".
+   ! Per 2024-04.08 these are in sync with the
+   !     chem_mech document (NorESM/components/cam/src/chemistry/pp_trop_mam_oslo/chem_mech.doc) line 109-111
+   !     (monoterp = 0.15) and line 112-114 (isoprene = 0.005).
    tot_dms_lost_as_S(:ncol) = - GS_DMS(:ncol,lchnk) * sulfurMassFraction(l_dms)
-   msa_prod_from_dms_as_S(:ncol) = sulfurMassFraction_MSA * (                          &
-      GS_SOA(:ncol, lchnk) -                                                           &
-      (-1.0_r8 * ( 0.005_r8*SOAyield_isoprene*GS_isoprene(:ncol, lchnk) +              &
-                   0.15_r8*SOAyield_monoterp*GS_monoterp(:ncol, lchnk) ) )             &
-   )
+   msa_prod_from_dms_as_S(:ncol) = sulfurMassFraction_MSA * (              &
+      GS_SOA(:ncol, lchnk) -                                               &
+      (-1.0_r8 * ( 0.005_r8*SOAyield_isoprene*GS_isoprene(:ncol, lchnk) +  &
+                   0.15_r8*SOAyield_monoterp*GS_monoterp(:ncol, lchnk) ) ) )
 
    SO2_formed_from_DMS_as_S(:ncol) = tot_dms_lost_as_S(:ncol) - msa_prod_from_dms_as_S(:ncol)
 
@@ -1894,10 +1875,6 @@ subroutine summation_fields_writeout(lchnk, ncol)
    ! OM outfld calls
    call outfld('emis_OM', emis_OM(:), ncol, lchnk)
    call outfld('sour_OM', sour_OM(:), ncol, lchnk)
-   ! tmp field outfld
-   call outfld('tot_dms_lost_as_S', tot_dms_lost_as_S(:), ncol, lchnk)
-   call outfld('msa_prod_from_dms_as_S', msa_prod_from_dms_as_S(:), ncol, lchnk)
-   call outfld('SO2_formed_from_DMS_as_S', SO2_formed_from_DMS_as_S(:), ncol, lchnk)
 
 end subroutine summation_fields_writeout
 

@@ -538,7 +538,7 @@ contains
        endif
 
       ! OSLO_AERO begin
-      ! Add the 3D consentrations
+      ! Add the 3D concentrations
       if ( n > 0 ) then
          ! if history_aerosol_decomposed we add the aerosol species
          if ( (any( aer_species == m ) .or. isAerosol(n)) ) then
@@ -582,8 +582,8 @@ contains
 
          ! If the aerosol tracer is so2 or dms we add the column burden of the sulfur mass only as well to output
          if ( n == l_so2 .or. n == l_dms ) then
-            call addfld(trim('cb_'//trim(spc_name)//'_S'), horiz_only, 'A', 'kg*S/m2', &
-               'cb_'//trim(spc_name)//' column, sulfur mass only')
+            call addfld(trim('cb_'//trim(spc_name)//'_S'), horiz_only, 'A', 'kg/m2', &
+               'cb_'//trim(spc_name)//' column burden, sulfur mass only')
          endif
 
          ! if the species is an aerosol we require history_aerosol_decomposed flag to output the column burden
@@ -627,10 +627,10 @@ contains
    do l_atype=1,N_AEROSOL_TYPES
       ! add the column burden of the compound aerosols to output
       call addfld('cb_'//trim(aerosol_type_name(l_atype)),horiz_only, 'A', 'kg/m2',&
-         'cb_'//trim(aerosol_type_name(l_atype))//' column of aerosol type')
+         'cb_'//trim(aerosol_type_name(l_atype))//' column burden of aerosol type')
       if ( l_atype == AEROSOL_TYPE_SULFATE ) then
-         call addfld('cb_'//trim(aerosol_type_name(l_atype))//'_S',horiz_only, 'A', 'kg*S/m2',&
-         'cb_'//trim(aerosol_type_name(l_atype))//' column of aerosol, sulfur mass only')
+         call addfld('cb_'//trim(aerosol_type_name(l_atype))//'_S',horiz_only, 'A', 'kg/m2',&
+         'cb_'//trim(aerosol_type_name(l_atype))//' column burden of aerosol, sulfur mass only')
       endif
       ! we require history_aerosol_base flag
       if ( history_aerosol_base ) then

@@ -25,8 +25,6 @@ module mo_neu_wetdep
   public :: neu_wetdep_init
   public :: neu_wetdep_tend
 !
-  save
-!
   integer, allocatable, dimension(:) :: mapping_to_heff,mapping_to_mmr
   real(r8),allocatable, dimension(:) :: mol_weight
   logical ,allocatable, dimension(:) :: ice_uptake
@@ -264,7 +262,7 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt,   &
   use ppgrid,           only : pcols, pver
   use phys_grid,        only : get_area_all_p, get_rlat_all_p
   use shr_const_mod,    only : SHR_CONST_REARTH,SHR_CONST_G
-  use cam_history,      only : outfld
+  use cam_history,      only : outfld, hist_fld_active
   use shr_const_mod,    only : pi => shr_const_pi
   ! OSLO_AERO begin
   use oslo_aero_share,  only : sulfurMassFraction
@@ -273,9 +271,7 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt,   &
   use constituents,     only : cnst_get_ind
   use mo_tracname,      only : solsym
   ! OSLO_AERO end
-!
-  implicit none
-!
+
   integer,        intent(in)    :: lchnk,ncol
   real(r8),       intent(in)    :: mmr(pcols,pver,pcnst)    ! mass mixing ratio (kg/kg)
   real(r8),       intent(in)    :: pmid(pcols,pver)         ! midpoint pressures (Pa)
@@ -324,6 +320,7 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt,   &
   real(r8)            :: wrk_wd(pcols)
   integer             :: l_aero
   real(r8), pointer   :: wd_a_h2so4(:)
+  logical,            :: computed_wrd_wd
   ! OSLO_AERO end
 !
 ! from cam/src/physics/cam/stratiform.F90
@@ -526,21 +523,26 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt,   &
   ! OSLO_AERO begin
   !This is output normally in mo_chm_diags, but if neu wetdep, we have to output it here!
   do m=1,gas_wetdep_cnt
-    wrk_wd(:ncol) = 0.0_r8
-    do k=1,pver
+    if ((l_aero == l_so2) .or. (l_aero == l_h2so4) .or.                    &
+         hist_fld_active('WD_A_'//trim(gas_wetdep_list(m)))) then
+      wrk_wd(:ncol) = 0.0_r8
+      do k=1,pver
         !Note sign: tendency is negative, so this becomes a positive flux!
         wrk_wd(:ncol) = wrk_wd(:ncol) - wd_tend(1:ncol,k,mapping_to_mmr(m))*pdel(:ncol,k)*rgrav !kg/m2/sec
-    end do
+      end do
+      computed_wrd_wd = .true.
+   else
+     computed_wrd_wd = .false.
+    end if
 
     ! get the index of the gas species that coresponds to the l_spcies system
     call cnst_get_ind(trim(gas_wetdep_list(m)), l_aero, abort=.false.)
 
-    call outfld('WD_A_'//trim(gas_wetdep_list(m)),wrk_wd(:ncol),ncol,lchnk)
+    if (computed_wrd_wd) then
+      call outfld('WD_A_'//trim(gas_wetdep_list(m)),wrk_wd(:ncol),ncol,lchnk)
+    end if
 
-    if ( l_aero == l_so2 ) then
-
-      if ( masterproc ) write(iulog,*) 'OSLO_AERO, mo_neu_wetdep, line 546: l_aero = l_so2, outputting wet_SO2 and wet_SO2_S', &
-        'gas_wetdep_list(m) = ', trim(gas_wetdep_list(m))
+    if ((l_aero == l_so2) .and. computed_wrd_wd) then
 
       call outfld('wet_SO2', wrk_wd(:ncol), ncol, lchnk)
       call outfld('wet_SO2_S', ( wrk_wd(:ncol) * sulfurMassFraction(l_so2) ), ncol, lchnk)
@@ -550,25 +552,17 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt,   &
 
     ! Save the WD_A field to the wd_a_h2so4 pointer if l_aero == l_h2so4
     ! this field is passed to the pbuf
-    if (l_aero == l_h2so4) then
-
-      if ( masterproc ) write(iulog,*) 'OSLO_AERO, mo_neu_wetdep, line 559: l_aero = l_h2so4, outputting wd_a_h2so4', &
-        ' to the pbuf gas_wetdep_list(m) = ', trim(gas_wetdep_list(m))
+    if ((l_aero == l_h2so4) .and. computed_wrd_wd) then
 
       idx_wd_a_h2so4 = pbuf_get_index('WD_A_H2SO4')
 
-      if ( masterproc ) write(iulog,*) 'OSLO_AERO, mo_neu_wetdep, line 564: idx_wd_a_h2so4 = ', idx_wd_a_h2so4
       call pbuf_get_field(pbuf, idx_wd_a_h2so4, wd_a_h2so4)
-      if ( masterproc ) write(iulog,*) 'OSLO_AERO, mo_neu_wetdep, line 567: pbuf_get_field for wd_a_h2so4 done', &
-        ' idx_wd_a_h2so4 = ', idx_wd_a_h2so4, ' wd_a_h2so4 size = ', size(wd_a_h2so4)
 
       wd_a_h2so4(:ncol) = wrk_wd(:ncol)
-      if ( masterproc ) write(iulog,*) 'OSLO_AERO, mo_neu_wetdep, line 569: write wrk_wd to wd_a_h2so4(:ncol)'
-    end if
 
+    end if
   end do
   ! OSLO_AERO end
-
 
   if ( do_diag ) then
     call outfld('QT_RAIN_HNO3', qt_rain, ncol, lchnk )
@@ -591,7 +585,6 @@ end subroutine neu_wetdep_tend
       RLS,CLWC,CIWC,CFR,TEM,EVAPRATE,GAREA,HSTAR,TCMASS,TCKAQB, &
       TCNION, qt_rain, qt_rime, qt_wash, qt_evap)
 !
-      implicit none
 
 !-----------------------------------------------------------------------
 !---p-conde 5.4 (2007)   -----called from main-----
@@ -1650,7 +1643,6 @@ upper_level : &
 !---------------------------------------------------------------------
       subroutine DISGAS (CLWX,CFX,MOLMASS,HSTAR,TM,PR,QM,QT,QTDIS)
 !---------------------------------------------------------------------
-      implicit none
       real(r8), intent(in) :: CLWX,CFX    !cloud water,cloud fraction
       real(r8), intent(in) :: MOLMASS     !molecular mass of tracer
       real(r8), intent(in) :: HSTAR       !Henry's Law coeffs A*exp(-B/T)
@@ -1699,7 +1691,6 @@ upper_level : &
 !---
 !---Does NOT now use RMC (moist conv rain) but could, assuming 30% coverage
 !-----------------------------------------------------------------------
-      implicit none
       real(r8), intent(in) :: RRAIN       !new rain formation in box (kg/s)
       real(r8), intent(in) :: DTSCAV      !time step (s)
       real(r8), intent(in) :: CLWX,CFX !cloud water and cloud fraction
@@ -1741,7 +1732,6 @@ upper_level : &
 !---ALSO the possible formation of other soluble species from, eg, CH2O, H2O2
 !---   can be considered with enhanced values of KHA.
 !-----------------------------------------------------------------------
-      implicit none
       real(r8), intent(in)  :: RWASH   ! precip leaving bottom of box (kg/s)
       real(r8), intent(in)  :: BOXF   ! fraction of box with washout
       real(r8), intent(in)  :: DTSCAV  ! time step (s)
@@ -1796,7 +1786,6 @@ upper_level : &
 !-----------------------------------------------------------------------
       use shr_spfn_mod, only: shr_spfn_gamma
 
-      implicit none
       real(r8), intent(in)  :: CWATER
       real(r8), intent(in)  :: RRATE
 

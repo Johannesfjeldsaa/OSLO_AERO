@@ -173,7 +173,7 @@ contains
   subroutine aero_model_init( pbuf2d )
 
    use string_utils, only: int2str
-   use mo_setsox, only: sox_inti
+   use mo_setsox,    only: sox_inti
 
    ! args
    type(physics_buffer_desc), pointer :: pbuf2d(:,:)
