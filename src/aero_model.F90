@@ -44,6 +44,8 @@ module aero_model
   use oslo_aero_share,          only: lifeCycleNumberMedianRadius, rhopart, lifeCycleSigma
   use oslo_aero_share,          only: l_so4_a2, l_bc_n, l_bc_ax, l_dms, l_isoprene, l_monoterp
   use oslo_aero_share,          only: MODE_IDX_BC_NUC, MODE_IDX_BC_EXT_AC
+  use oslo_aero_share,          only: getNumberofTracersInMode, getCloudTracerIndexDirect, getCloudTracerName
+  use oslo_aero_share,          only: getTracerIndex
   use oslo_aero_control,        only: oslo_aero_ctl_readnl, use_aerocom
   use oslo_aero_depos,          only: oslo_aero_depos_init
   use oslo_aero_depos,          only: oslo_aero_depos_dry, oslo_aero_depos_wet, oslo_aero_wetdep_init
@@ -53,8 +55,6 @@ module aero_model
   use oslo_aero_seasalt,        only: oslo_aero_seasalt_init, oslo_aero_seasalt_emis, seasalt_active
   use oslo_aero_dust,           only: oslo_aero_dust_init, oslo_aero_dust_emis
   use oslo_aero_ocean,          only: oslo_aero_ocean_init, oslo_aero_dms_emis
-  use oslo_aero_share,          only: getNumberofTracersInMode, getCloudTracerIndexDirect, getCloudTracerName
-  use oslo_aero_share,          only: getCloudTracerName, getTracerIndex, aero_register
   use oslo_aero_sox_cldaero,    only: sox_cldaero_init
   use oslo_aero_microp,         only: oslo_aero_microp_readnl
   use oslo_aero_sw_tables,      only: initopt
@@ -947,9 +947,12 @@ contains
   subroutine calcaersize_sub( ncol, t, h2ommr, pmid, pdel,wetnumberMedianDiameter,wetrho,   &
        wetNumberMedianDiameter_processmode, wetrho_processmode)
 
-    ! Seland Calculates mean volume size and hygroscopic growth for use in  dry deposition
+     use oslo_aero_share, only: max_tracers_per_mode, rhtab, rdivr0
+     use oslo_aero_share, only: getNumberOfBackgroundTracersInMode
+     use oslo_aero_share, only: getDryDensity, tracerInProcessMode
+     use oslo_aero_share, only: processModeNumberMedianRadius, processModeSigma
 
-    use oslo_aero_share
+    ! Seland Calculates mean volume size and hygroscopic growth for use in  dry deposition
 
     integer,  intent(in)  :: ncol               ! number of columns
     real(r8), intent(in)  :: t(pcols,pver)      ! layer temperatures (K)

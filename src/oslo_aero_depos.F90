@@ -110,10 +110,11 @@ contains
       use ppgrid,          only: pcols
 
       ! Register a pbuf field for
-      call pbuf_add_field('WD_A_H2SO4', 'physpkg', dtype_r8, (/pcols/), idx_wd_a_h2so4)
+      call pbuf_add_field('WD_A_H2SO4', 'global', dtype_r8, (/pcols/), idx_wd_a_h2so4)
    end subroutine oslo_aero_depos_register
 
   subroutine oslo_aero_depos_init( pbuf2d )
+    use time_manager,   only: is_first_step
     use physics_buffer, only: pbuf_set_field
 
     ! Set oslo aeroslo deposition history output
@@ -139,7 +140,9 @@ contains
     nevapr_shcu_idx = pbuf_get_index('NEVAPR_SHCU')
 
     call phys_getopts( history_aerosol_out = history_aerosol )
-    call pbuf_set_field(pbuf2d, idx_wd_a_h2so4, 0.0_r8)
+    if (is_first_step()) then
+       call pbuf_set_field(pbuf2d, idx_wd_a_h2so4, 0.0_r8)
+    end if
 
     is_in_output(:) =.false.
     drydep_lq(:) =.false.
@@ -957,7 +960,6 @@ contains
          call outfld('wet_'//trim(aerosol_type_name(l_atype)), -1.0_r8 * (sflx_SFWET_arosol_type(:ncol,l_atype)), ncol, lchnk)
       else if ( l_atype == AEROSOL_TYPE_SULFATE ) then
          ! Add in wd_a_h2so4
-         idx_wd_a_h2so4 = pbuf_get_index('WD_A_H2SO4')
          call pbuf_get_field(pbuf, idx_wd_a_h2so4, wd_a_h2so4)
 
          call outfld('wet_'//trim(aerosol_type_name(l_atype)),                &

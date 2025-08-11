@@ -320,7 +320,7 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt,   &
   real(r8)            :: wrk_wd(pcols)
   integer             :: l_aero
   real(r8), pointer   :: wd_a_h2so4(:)
-  logical,            :: computed_wrd_wd
+  logical             :: computed_wrk_wd
   ! OSLO_AERO end
 !
 ! from cam/src/physics/cam/stratiform.F90
@@ -334,7 +334,7 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt,   &
 !
 ! reset output variables
 !
-   wd_tend_int = 0._r8
+   wd_tend_int(:,:) = 0._r8
    WD_A_SO2_NEU(:ncol,lchnk) = 0._r8 ! OSLO_AERO
 !
 ! get area (in radians square)
@@ -523,6 +523,9 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt,   &
   ! OSLO_AERO begin
   !This is output normally in mo_chm_diags, but if neu wetdep, we have to output it here!
   do m=1,gas_wetdep_cnt
+    ! get the index of the gas species that coresponds to the l_species system
+    call cnst_get_ind(trim(gas_wetdep_list(m)), l_aero, abort=.false.)
+
     if ((l_aero == l_so2) .or. (l_aero == l_h2so4) .or.                    &
          hist_fld_active('WD_A_'//trim(gas_wetdep_list(m)))) then
       wrk_wd(:ncol) = 0.0_r8
@@ -530,19 +533,19 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt,   &
         !Note sign: tendency is negative, so this becomes a positive flux!
         wrk_wd(:ncol) = wrk_wd(:ncol) - wd_tend(1:ncol,k,mapping_to_mmr(m))*pdel(:ncol,k)*rgrav !kg/m2/sec
       end do
-      computed_wrd_wd = .true.
+      computed_wrk_wd = .true.
    else
-     computed_wrd_wd = .false.
+     computed_wrk_wd = .false.
     end if
 
-    ! get the index of the gas species that coresponds to the l_spcies system
-    call cnst_get_ind(trim(gas_wetdep_list(m)), l_aero, abort=.false.)
-
-    if (computed_wrd_wd) then
+    if (computed_wrk_wd) then
       call outfld('WD_A_'//trim(gas_wetdep_list(m)),wrk_wd(:ncol),ncol,lchnk)
     end if
 
-    if ((l_aero == l_so2) .and. computed_wrd_wd) then
+    if (l_aero == l_so2) then
+      if (.not. computed_wrk_wd) then
+        call endrun('neu_wetdep_tend: Internal ERROR for l_so2, wrk_wd')
+      end if
 
       call outfld('wet_SO2', wrk_wd(:ncol), ncol, lchnk)
       call outfld('wet_SO2_S', ( wrk_wd(:ncol) * sulfurMassFraction(l_so2) ), ncol, lchnk)
@@ -552,7 +555,10 @@ subroutine neu_wetdep_tend(lchnk,ncol,mmr,pmid,pdel,zint,tfld,delt,   &
 
     ! Save the WD_A field to the wd_a_h2so4 pointer if l_aero == l_h2so4
     ! this field is passed to the pbuf
-    if ((l_aero == l_h2so4) .and. computed_wrd_wd) then
+    if (l_aero == l_h2so4) then
+       if (.not. computed_wrk_wd) then
+        call endrun('neu_wetdep_tend: Internal ERROR for l_h2so4, wrk_wd')
+      end if
 
       idx_wd_a_h2so4 = pbuf_get_index('WD_A_H2SO4')
 
